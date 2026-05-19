@@ -1,0 +1,35 @@
+// ===== engine/AssetLoader.ts =====
+// Charge les images de façon asynchrone.
+// Si un asset est absent, retourne null (le renderer utilisera un fallback).
+export class AssetLoader {
+    constructor() {
+        this.cache = new Map();
+    }
+    /** Charge une image ; retourne null si introuvable. */
+    async load(url) {
+        if (this.cache.has(url))
+            return this.cache.get(url);
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                this.cache.set(url, img);
+                resolve(img);
+            };
+            img.onerror = () => {
+                console.warn(`[AssetLoader] Sprite non trouvé : ${url} — fallback actif`);
+                this.cache.set(url, null);
+                resolve(null);
+            };
+            img.src = url;
+        });
+    }
+    /** Récupère un asset déjà chargé (ou null). */
+    get(url) {
+        return this.cache.get(url) ?? null;
+    }
+    /** Charge plusieurs assets en parallèle. */
+    async loadAll(urls) {
+        await Promise.all(urls.map((u) => this.load(u)));
+    }
+}
+export const assets = new AssetLoader();
