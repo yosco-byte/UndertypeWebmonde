@@ -1,11 +1,7 @@
-// ===== engine/AssetLoader.ts =====
-// Charge les images de façon asynchrone.
-// Si un asset est absent, retourne null (le renderer utilisera un fallback).
-
 export class AssetLoader {
   private cache = new Map<string, HTMLImageElement | null>();
 
-  /** Charge une image ; retourne null si introuvable. */
+  
   async load(url: string): Promise<HTMLImageElement | null> {
     if (this.cache.has(url)) return this.cache.get(url)!;
 
@@ -24,12 +20,10 @@ export class AssetLoader {
     });
   }
 
-  /** Récupère un asset déjà chargé (ou null). */
   get(url: string): HTMLImageElement | null {
     return this.cache.get(url) ?? null;
   }
 
-  /** Charge plusieurs assets en parallèle. */
   async loadAll(urls: string[]): Promise<void> {
     await Promise.all(urls.map((u) => this.load(u)));
   }

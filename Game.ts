@@ -1,12 +1,14 @@
-// ===== engine/Game.ts =====
-// Boucle de jeu principale avec timestep fixe (60 fps cible).
 
 import { Input } from "./Input";
 import { sceneManager } from "./SceneManager";
 import { OverworldScene } from "./OverworldScene";
+import { BossGrinch } from "./BossGrinch";
+import { BossMonika } from "./BossMonika";
+import { BossOmori } from "./BossOmori";
+import { gameState } from "./GameState";
 
 const TARGET_FPS = 60;
-const MAX_DT = 1 / 15; // évite les gros sauts si l'onglet est mis en pause
+const MAX_DT = 1 / 15; 
 
 export class Game {
   private canvas: HTMLCanvasElement;
@@ -35,14 +37,29 @@ export class Game {
     const W = this.W;
     const H = this.H;
 
-    // Overworld — démarre sur ruins_1
+
     sceneManager.register(
       "overworld",
-      () => new OverworldScene(input, W, H, "ruins_1")
+      () => new OverworldScene(input, W, H, gameState.returnMapId, gameState.returnX, gameState.returnY)
     );
 
-    // TODO : ajouter la scène de combat ici
-    // sceneManager.register("battle", () => new BattleScene(input, W, H));
+  
+    sceneManager.register(
+      "bossGrinch",
+      () => new BossGrinch(input, W, H)
+    );
+
+  
+    sceneManager.register(
+      "bossMonika",
+      () => new BossMonika(input, W, H)
+    );
+
+  
+    sceneManager.register(
+      "bossOmori",
+      () => new BossOmori(input, W, H)
+    );
 
     sceneManager.goto("overworld");
   }
@@ -60,8 +77,29 @@ export class Game {
     let dt = (now - this.lastTime) / 1000;
     this.lastTime = now;
 
-    // Évite les spirales de la mort
+  
     if (dt > MAX_DT) dt = MAX_DT;
+
+  
+    if (sceneManager.getCurrentId() === "overworld") {
+    
+      if (
+        this.input.isDown("KeyI") &&
+        this.input.isDown("KeyO") &&
+        this.input.isDown("KeyP")
+      ) {
+        sceneManager.goto("bossMonika");
+      }
+   
+      if (
+        this.input.isDown("KeyU") &&
+        this.input.isDown("KeyI") &&
+        this.input.isDown("KeyO")
+      ) {
+        gameState.monikaDefeated = true;
+        sceneManager.goto("bossOmori");
+      }
+    }
 
     sceneManager.update(dt);
     sceneManager.render(this.ctx);
