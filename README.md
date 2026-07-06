@@ -10,6 +10,10 @@ npm run dev        # lance le serveur de dev (http://localhost:5173)
 npm run build      # compile dans /docs (prêt pour GitHub Pages)
 ```
 
+OU 
+
+https://yosco-byte.github.io/UndertypeWebmonde/
+
 ## Raccourcis clavier
 
 | Touche         | Action    |
