@@ -1,5 +1,3 @@
-// ===== scenes/OverworldScene.ts =====
-
 import { Scene, sceneManager } from "./SceneManager";
 import { Input } from "./Input";
 import { Camera } from "./Camera";
@@ -86,7 +84,7 @@ export class OverworldScene implements Scene {
               npc.walkTo(exitX, exitY, () => {
                 npc.visible = false;        
                 this.cutsceneActive = false; 
-              }, 4, 1); 
+              }, 4,); 
             } else {
               this.cutsceneActive = false; 
             }
