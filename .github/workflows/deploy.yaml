@@ -2,12 +2,16 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [ main, master ] # Se déclenche quand tu push sur main ou master
+    branches: [ main, master ]
 
 permissions:
   contents: read
   pages: write
   id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -21,16 +25,20 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Dependencies & Compile
-        run: |
-          npm install -g typescript
-          tsc --init || true
-          tsc || echo "Compilation terminée (avec ou sans warnings)"
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build with Vite
+        run: npm run build   # génère /docs grâce à vite.config.ts
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.' # Dossier racine à envoyer sur GitHub Pages
+          path: 'docs'       # ← on envoie le dossier buildé, pas la racine
 
       - name: Deploy to GitHub Pages
+        id: deployment
         uses: actions/deploy-pages@v4
