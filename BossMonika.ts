@@ -437,7 +437,7 @@ export class BossMonika implements Scene {
       this.rhythmResultTimer -= dt;
       if (this.rhythmResultTimer <= 0) {
        
-        const dmg = this.rhythmPerfect ? 2 : 1;
+        const dmg = this.rhythmPerfect ? 3 : 1;
         this.monikaHitsLeft -= dmg;
         if (this.monikaHitsLeft <= 0) {
           
@@ -463,7 +463,7 @@ export class BossMonika implements Scene {
     if (this.input.wasPressed("KeyZ") || this.input.wasPressed("Enter")) {
       this.rhythmHit    = true;
       
-      this.rhythmPerfect = this.rhythmBarPos >= 0.30 && this.rhythmBarPos <= 0.70;
+      this.rhythmPerfect = this.rhythmBarPos >= 0.485 && this.rhythmBarPos <= 0.515;
       this.rhythmResultTimer = 0.8;
     }
   }
