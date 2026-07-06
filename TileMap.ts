@@ -1,62 +1,73 @@
-// ===== overworld/TileMap.ts =====
-// Rendu de la tilemap et détection de collision / transitions.
-
 import { MapData, TileType, Transition } from "./MapData";
 import { assets } from "./AssetLoader";
 
-export const TILE_SIZE = 32;
-
 export class TileMap {
+  
   readonly pixelW: number;
   readonly pixelH: number;
   readonly mapName: string;
+  readonly tileSize: number;
 
-  private tileset: HTMLImageElement | null = null;
+  private mapImage: HTMLImageElement | null = null;
+  private imageReady = false;
+
+  
+  private debugMode = false;
 
   constructor(private data: MapData) {
-    this.pixelW = data.width * TILE_SIZE;
-    this.pixelH = data.height * TILE_SIZE;
-    this.mapName = data.name;
-    // Tileset chargé en arrière-plan
-    if (data.tilesetUrl) {
-      assets.load(data.tilesetUrl).then((img) => {
-        this.tileset = img;
+    this.tileSize  = data.tileSize;
+    this.pixelW    = data.width  * data.tileSize;
+    this.pixelH    = data.height * data.tileSize;
+    this.mapName   = data.name;
+
+    
+    if (data.mapImageUrl) {
+      assets.load(data.mapImageUrl).then((img) => {
+        this.mapImage   = img;
+        this.imageReady = img !== null;
       });
     }
+
+   
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "KeyM") {
+        e.preventDefault();
+        this.debugMode = !this.debugMode;
+        console.log(`[TileMap] Mode debug : ${this.debugMode ? "ON" : "OFF"}`);
+      }
+    });
   }
 
-  // ── Queries ──────────────────────────────────────────────
 
-  /** Type de tuile à la position monde (px) */
+
+
   tileAt(wx: number, wy: number): TileType {
-    const tx = Math.floor(wx / TILE_SIZE);
-    const ty = Math.floor(wy / TILE_SIZE);
+    const tx = Math.floor(wx / this.tileSize);
+    const ty = Math.floor(wy / this.tileSize);
     return this.tileAtGrid(tx, ty);
   }
 
   tileAtGrid(tx: number, ty: number): TileType {
-    if (tx < 0 || ty < 0 || tx >= this.data.width || ty >= this.data.height) {
-      return TileType.Wall;
-    }
-    return this.data.tiles[ty * this.data.width + tx];
+    const { width, height, tiles } = this.data;
+    if (tx < 0 || ty < 0 || tx >= width || ty >= height) return TileType.Wall;
+    return tiles[ty * width + tx];
   }
 
-  /** True si le rectangle (px) chevauche un mur */
+
   isBlocked(x: number, y: number, w: number, h: number): boolean {
-    // On teste les 4 coins du rectangle joueur
-    const corners = [
-      [x, y],
-      [x + w - 1, y],
-      [x, y + h - 1],
+    const corners: [number, number][] = [
+      [x,         y        ],
+      [x + w - 1, y        ],
+      [x,         y + h - 1],
       [x + w - 1, y + h - 1],
     ];
     return corners.some(([cx, cy]) => this.tileAt(cx, cy) === TileType.Wall);
   }
 
-  /** Retourne la transition déclenchée par le centre du joueur, ou null */
+
   transitionAt(centerX: number, centerY: number): Transition | null {
-    const tx = Math.floor(centerX / TILE_SIZE);
-    const ty = Math.floor(centerY / TILE_SIZE);
+    const tx = Math.floor(centerX / this.tileSize);
+    const ty = Math.floor(centerY / this.tileSize);
     if (this.tileAtGrid(tx, ty) !== TileType.Transition) return null;
     return (
       this.data.transitions.find((t) => t.tileX === tx && t.tileY === ty) ??
@@ -64,68 +75,102 @@ export class TileMap {
     );
   }
 
-  // ── Render ───────────────────────────────────────────────
+  
 
   render(ctx: CanvasRenderingContext2D): void {
-    const { width, height, tiles, colors } = this.data;
+    if (this.imageReady && this.mapImage) {
+    
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(this.mapImage, 0, 0, this.pixelW, this.pixelH);
+    } else {
+   
+      this.renderFallback(ctx);
+    }
 
-    // Fond global
+  
+    if (this.debugMode) {
+      this.renderDebugGrid(ctx);
+    }
+  }
+
+  private renderFallback(ctx: CanvasRenderingContext2D): void {
+    const { width, height, tiles, colors } = this.data;
+    const S = this.tileSize;
+
     ctx.fillStyle = colors.bg;
     ctx.fillRect(0, 0, this.pixelW, this.pixelH);
 
     for (let ty = 0; ty < height; ty++) {
       for (let tx = 0; tx < width; tx++) {
         const tile = tiles[ty * width + tx];
-        const px = tx * TILE_SIZE;
-        const py = ty * TILE_SIZE;
+        const px   = tx * S;
+        const py   = ty * S;
 
         if (tile === TileType.Floor) {
-          this.drawFloor(ctx, px, py, colors.floor);
+          ctx.fillStyle = colors.floor;
+          ctx.fillRect(px, py, S, S);
+          ctx.strokeStyle = "rgba(255,255,255,0.04)";
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(px + 0.5, py + 0.5, S - 1, S - 1);
+
         } else if (tile === TileType.Transition) {
-          this.drawTransition(ctx, px, py, colors.transition);
+          ctx.fillStyle = colors.transition;
+          ctx.fillRect(px, py, S, S);
+          const cx = px + S / 2, cy = py + S / 2;
+          ctx.fillStyle = "rgba(255,255,200,0.4)";
+          ctx.beginPath();
+          ctx.moveTo(cx, cy + S * 0.3);
+          ctx.lineTo(cx - S * 0.2, cy);
+          ctx.lineTo(cx + S * 0.2, cy);
+          ctx.closePath();
+          ctx.fill();
         }
-        // Wall = bg, déjà rempli
       }
     }
   }
 
-  private drawFloor(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    color: string
-  ): void {
-    if (this.tileset) {
-      // Utilise le tileset si disponible (tuile sol = 0,0 dans le tileset)
-      ctx.drawImage(this.tileset, 0, 0, TILE_SIZE, TILE_SIZE, px, py, TILE_SIZE, TILE_SIZE);
-    } else {
-      // Fallback : sol coloré avec légère texture
-      ctx.fillStyle = color;
-      ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-      // Petite grille subtile
-      ctx.strokeStyle = "rgba(255,255,255,0.04)";
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(px + 0.5, py + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-    }
-  }
+  private renderDebugGrid(ctx: CanvasRenderingContext2D): void {
+    const { width, height, tiles } = this.data;
+    const S = this.tileSize;
 
-  private drawTransition(
-    ctx: CanvasRenderingContext2D,
-    px: number,
-    py: number,
-    color: string
-  ): void {
-    // Sol de base
-    this.drawFloor(ctx, px, py, color);
-    // Indicateur visuel (flèche vers le bas)
-    const cx = px + TILE_SIZE / 2;
-    const cy = py + TILE_SIZE / 2;
-    ctx.fillStyle = "rgba(255, 255, 200, 0.35)";
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + 10);
-    ctx.lineTo(cx - 7, cy);
-    ctx.lineTo(cx + 7, cy);
-    ctx.closePath();
-    ctx.fill();
+    for (let ty = 0; ty < height; ty++) {
+      for (let tx = 0; tx < width; tx++) {
+        const tile = tiles[ty * width + tx];
+        const px   = tx * S;
+        const py   = ty * S;
+
+        if (tile === TileType.Wall) {
+          ctx.fillStyle = "rgba(255, 0, 0, 0.25)";
+          ctx.fillRect(px, py, S, S);
+        } else if (tile === TileType.Transition) {
+          ctx.fillStyle = "rgba(0, 255, 200, 0.35)";
+          ctx.fillRect(px, py, S, S);
+        }
+        ctx.strokeStyle = "rgba(255,255,255,0.12)";
+        ctx.lineWidth   = 0.5;
+        ctx.strokeRect(px, py, S, S);
+
+       
+        if (tx % 5 === 0 && ty % 5 === 0) {
+          ctx.fillStyle = "rgba(255,255,255,0.6)";
+          ctx.font      = "9px monospace";
+          ctx.fillText(`${tx},${ty}`, px + 2, py + 10);
+        }
+      }
+    }
+
+    
+    ctx.fillStyle = "rgba(0,0,0,0.65)";
+    ctx.fillRect(4, 4, 180, 52);
+    ctx.font = "11px monospace";
+    ctx.fillStyle = "rgba(255,0,0,0.8)";
+    ctx.fillText("█ Wall  (bloquant)", 10, 18);
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillText("□ Floor (passable)", 10, 32);
+    ctx.fillStyle = "rgba(0,255,200,0.8)";
+    ctx.fillText("█ Transition", 10, 46);
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "10px monospace";
+    ctx.fillText("KeyM = toggle debug", 10, 60);
   }
 }

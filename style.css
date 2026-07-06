@@ -1,5 +1,3 @@
-/* ===== HTMLTALE — Global Style ===== */
-
 *,
 *::before,
 *::after {
@@ -33,7 +31,6 @@ body {
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  /* Scale up keeping pixel art crisp */
-  max-width: 100%;
-  max-height: 100%;
+  width: 100vw;
+  height: 100vh;
 }
