@@ -445,12 +445,7 @@ export class BossMonika implements Scene {
           this.phase = "victory";
           this.dialogue.start(DIALOGUE_VICTORY, () => this.endBattle(true));
         } else {
-      
-          if (second) {
-            this.endBattle(); 
-          } else {
-            this.startAttack2();
-          }
+          this.startAttack2();
         }
       }
       return;
@@ -487,11 +482,7 @@ export class BossMonika implements Scene {
         
         this.phase = second ? "inspectDialogue2" : "inspectDialogue";
         this.dialogue.start(DIALOGUE_INSPECT, () => {
-          if (second) {
-            this.endBattle();
-          } else {
-            this.startAttack2();
-          }
+          this.startAttack2();
         });
       } else {
         const talkLine: DialogueLine[] = [{ speaker: "Monika", text: "test" }];
