@@ -1,4 +1,3 @@
-
 import { Scene, sceneManager } from "./SceneManager";
 import { Input } from "./Input";
 import { assets } from "./AssetLoader";
@@ -86,6 +85,8 @@ interface Projectile {
    *  attaques en formation, ex: la silhouette du crâne) */
   anchorOffsetX?: number;
   anchorOffsetY?: number;
+  /** délai (s) avant que le couteau ne "démarre" — utilisé par l'attaque transition */
+  delay?: number;
   done: boolean;
 }
 
@@ -232,6 +233,39 @@ export class BossOmori implements Scene {
 
   private cssCommandText: string | null = null;
 
+  /** Attaque couteaux : schéma FIXE, toujours le même, sur un cycle de 4.5s répété. */
+  private readonly KNIFE_WAVE_CYCLE = 4.5;
+  private knifeWaveCycleCount = -1;
+  private knifeWaveCycleIndex = -1;
+  /** 3 couteaux depuis la droite, puis 2 depuis la gauche, puis 5 en diagonale — toujours dans cet ordre. */
+  private readonly KNIFE_WAVE_SCHEDULE: { t: number; spawn: () => void }[] = [
+    { t: 0.0, spawn: () => this.spawnKnifeGroupRight(3) },
+    { t: 1.4, spawn: () => this.spawnKnifeGroupLeft(2) },
+    { t: 2.6, spawn: () => this.spawnKnifeGroupDiagonal(5) },
+  ];
+
+  /** Attaque "scale" — le cœur (et sa hitbox) est agrandi. */
+  private heartScale = 1;
+  private scaleRainTimer = 0;
+
+  /** Attaque "grid" — couteaux qui tombent selon un schéma de colonnes fixe. */
+  private readonly GRID_LANES = 4;
+  private readonly GRID_PATTERN = [0, 2, 1, 3, 0, 3, 1, 2];
+  private gridWaveTimer = 0;
+  private gridWaveIndex = 0;
+
+  /** Attaque "transition" — couteaux immobiles qui foncent d'un coup après un délai. */
+  private transitionRainTimer = 0;
+
+  /** Attaque "ring" — anneau de couteaux en rotation qui se resserre. */
+  private ringAngle = 0;
+  private ringRadius = 0;
+
+  /** Attaque "clock" — couteaux envoyés depuis les 4 côtés dans un ordre fixe. */
+  private readonly CLOCK_SIDES: ("top" | "right" | "bottom" | "left")[] = ["top", "right", "bottom", "left"];
+  private clockWaveTimer = 0;
+  private clockWaveIndex = 0;
+
   private phase: Phase = "fadeIn";
   private phaseTimer = 0;
   private attackDuration = 0;
@@ -241,7 +275,7 @@ export class BossOmori implements Scene {
   private rhythmBarPos = 0;
   private rhythmBarDir = 1;
   private readonly RHYTHM_SPEED = 1.1;
-  private readonly RHYTHM_ZONE_W = 0.16;
+  private readonly RHYTHM_ZONE_W = 0.03;
   private rhythmHit = false;
   private rhythmPerfect = false;
   private rhythmResultTimer = 0;
@@ -392,6 +426,7 @@ export class BossOmori implements Scene {
       if (this.rhythmResultTimer <= 0) {
         const dmg = this.rhythmPerfect ? PLAYER_DMG_PERFECT : PLAYER_DMG_NORMAL;
         this.omoriHp = Math.max(0, this.omoriHp - dmg);
+        this.triggerShake(0.2, this.rhythmPerfect ? 9 : 4);
         if (this.omoriHp <= 0) {
           this.startVictory();
         } else {
@@ -489,25 +524,71 @@ export class BossOmori implements Scene {
   }
 
 
-  private attackKnifeWave(): void {
-    this.attackDuration = 6;
-    const cols = 6;
-    for (let i = 0; i < cols; i++) {
-      const x = this.boxX + (this.boxW * (i + 0.5)) / cols;
-      this.spawnKnife(x, this.boxY - 40 - i * 24, 0, 55 + (i % 2) * 10);
+  /** Envoie `count` couteaux depuis la droite de la boîte, qui filent vers la gauche. */
+  private spawnKnifeGroupRight(count: number): void {
+    for (let i = 0; i < count; i++) {
+      const y = this.boxY + ((i + 1) / (count + 1)) * this.boxH;
+      this.spawnKnife(this.boxX + this.boxW + 20, y, -125, 0);
     }
+  }
+
+  /** Envoie `count` couteaux depuis la gauche de la boîte, qui filent vers la droite. */
+  private spawnKnifeGroupLeft(count: number): void {
+    for (let i = 0; i < count; i++) {
+      const y = this.boxY + ((i + 1) / (count + 1)) * this.boxH;
+      this.spawnKnife(this.boxX - 20, y, 125, 0);
+    }
+  }
+
+  /** Envoie `count` couteaux alignés en diagonale (coin haut-gauche vers bas-droit). */
+  private spawnKnifeGroupDiagonal(count: number): void {
+    for (let i = 0; i < count; i++) {
+      const offset = (i - (count - 1) / 2) * 22;
+      this.spawnKnife(this.boxX - 20 + offset, this.boxY - 20 - offset, 95, 95);
+    }
+  }
+
+  /**
+   * Phase de couteaux : dure exactement 20 secondes.
+   * Le schéma est TOUJOURS le même, répété en boucle sur des cycles de 4.5s :
+   * 3 couteaux à droite → 2 à gauche → 5 en diagonale.
+   */
+  private attackKnifeWave(): void {
+    this.attackDuration = 20;
+    this.knifeWaveCycleCount = -1;
+    this.knifeWaveCycleIndex = -1;
   }
 
   private updateKnifeWave(dt: number): void {
     const t = this.phaseTimer;
+
+    if (t < this.attackDuration - 1.5) {
+      const cycleT   = t % this.KNIFE_WAVE_CYCLE;
+      const cycleNum = Math.floor(t / this.KNIFE_WAVE_CYCLE);
+      if (cycleNum !== this.knifeWaveCycleCount) {
+        this.knifeWaveCycleCount = cycleNum;
+        this.knifeWaveCycleIndex = -1;
+      }
+      for (let i = this.knifeWaveCycleIndex + 1; i < this.KNIFE_WAVE_SCHEDULE.length; i++) {
+        if (cycleT >= this.KNIFE_WAVE_SCHEDULE[i].t) {
+          this.KNIFE_WAVE_SCHEDULE[i].spawn();
+          this.knifeWaveCycleIndex = i;
+        } else break;
+      }
+    }
+
     for (const p of this.projectiles) {
       if (p.done) continue;
+      p.x += p.vx * dt * this.speedMultiplier;
       p.y += p.vy * dt * this.speedMultiplier;
-      p.x += Math.sin(t * 3 + p.y * 0.05) * 40 * dt;
       this.checkKnifeCollision(p);
-      if (p.y > this.boxY + this.boxH + 40) p.done = true;
+      if (
+        p.x < this.boxX - 60 || p.x > this.boxX + this.boxW + 60 ||
+        p.y < this.boxY - 60 || p.y > this.boxY + this.boxH + 60
+      ) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
+
     if (t >= this.attackDuration && this.projectiles.length === 0) this.endAttack();
   }
 
@@ -816,6 +897,195 @@ export class BossOmori implements Scene {
       p.y += p.vy * dt * this.speedMultiplier;
       if (p.isKnife) this.checkKnifeCollision(p); else this.checkTagCollision(p);
       if (p.y > this.boxY + this.boxH + 40) p.done = true;
+    }
+    this.projectiles = this.projectiles.filter(p => !p.done);
+    if (this.phaseTimer >= this.attackDuration) this.endAttack();
+  }
+
+
+  /**
+   * Nouvelle attaque — "transform: scale()"
+   * Le cœur (et donc sa hitbox) est agrandi, ce qui le rend bien plus facile à toucher.
+   * Pendant ce temps, une pluie de couteaux et de balises continue de tomber.
+   */
+  private attackCssScale(): void {
+    this.attackDuration = 10;
+    this.cssCommandText = ".heart { transform: scale(2.5); }";
+    this.heartScale = 2.5;
+    this.scaleRainTimer = 0;
+  }
+
+  private updateCssScale(dt: number): void {
+    this.scaleRainTimer += dt;
+    if (this.scaleRainTimer >= 0.3 && this.phaseTimer < this.attackDuration - 1) {
+      this.scaleRainTimer = 0;
+      const x = this.boxX + Math.random() * this.boxW;
+      if (Math.random() < 0.5) {
+        this.spawnKnife(x, this.boxY - 20, (Math.random() - 0.5) * 20, 95);
+      } else {
+        this.spawnTag(x, this.boxY - 20, (Math.random() - 0.5) * 20, 80, Math.random() < 0.4);
+      }
+    }
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      p.x += p.vx * dt * this.speedMultiplier;
+      p.y += p.vy * dt * this.speedMultiplier;
+      if (p.isKnife) this.checkKnifeCollision(p); else this.checkTagCollision(p);
+      if (p.y > this.boxY + this.boxH + 30) p.done = true;
+    }
+    this.projectiles = this.projectiles.filter(p => !p.done);
+    if (this.phaseTimer >= this.attackDuration) this.endAttack();
+  }
+
+
+  /**
+   * Nouvelle attaque — "grid-template-columns: repeat(4, 1fr)"
+   * Les couteaux tombent dans des colonnes fixes, toujours selon le même schéma de voies.
+   */
+  private attackCssGrid(): void {
+    this.attackDuration = 10;
+    this.cssCommandText = ".arena { grid-template-columns: repeat(4, 1fr); }";
+    this.gridWaveTimer = 0;
+    this.gridWaveIndex = 0;
+  }
+
+  private updateCssGrid(dt: number): void {
+    this.gridWaveTimer += dt;
+    if (this.gridWaveTimer >= 0.5 && this.phaseTimer < this.attackDuration - 1) {
+      this.gridWaveTimer = 0;
+      const lane = this.GRID_PATTERN[this.gridWaveIndex % this.GRID_PATTERN.length];
+      this.gridWaveIndex++;
+      const laneW = this.boxW / this.GRID_LANES;
+      const x = this.boxX + laneW * (lane + 0.5);
+      this.spawnKnife(x, this.boxY - 20, 0, 105);
+    }
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      p.y += p.vy * dt * this.speedMultiplier;
+      this.checkKnifeCollision(p);
+      if (p.y > this.boxY + this.boxH + 30) p.done = true;
+    }
+    this.projectiles = this.projectiles.filter(p => !p.done);
+    if (this.phaseTimer >= this.attackDuration) this.endAttack();
+  }
+
+
+  /**
+   * Nouvelle attaque — "transition: transform 0.1s ease-in"
+   * Des couteaux immobiles apparaissent, puis foncent d'un coup vers le cœur après un court délai.
+   */
+  private attackCssTransition(): void {
+    this.attackDuration = 9;
+    this.cssCommandText = ".couteau { transition: transform 0.1s ease-in; }";
+    this.transitionRainTimer = 0;
+  }
+
+  private updateCssTransition(dt: number): void {
+    this.transitionRainTimer += dt;
+    if (this.transitionRainTimer >= 0.6 && this.phaseTimer < this.attackDuration - 1.5) {
+      this.transitionRainTimer = 0;
+      const x = this.boxX + Math.random() * this.boxW;
+      const y = this.boxY + Math.random() * this.boxH;
+      this.projectiles.push({ isKnife: true, bad: false, text: "†", x, y, vx: 0, vy: 0, scale: 1, done: false, delay: 0.9 });
+    }
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      if (p.delay !== undefined && p.delay > 0) {
+        p.delay -= dt;
+        if (p.delay <= 0) {
+          const dx = this.heartX - p.x, dy = this.heartY - p.y;
+          const len = Math.hypot(dx, dy) || 1;
+          p.vx = (dx / len) * 220;
+          p.vy = (dy / len) * 220;
+        }
+      } else {
+        p.x += p.vx * dt * this.speedMultiplier;
+        p.y += p.vy * dt * this.speedMultiplier;
+      }
+      this.checkKnifeCollision(p);
+      if (
+        p.x < this.boxX - 40 || p.x > this.boxX + this.boxW + 40 ||
+        p.y < this.boxY - 40 || p.y > this.boxY + this.boxH + 40
+      ) p.done = true;
+    }
+    this.projectiles = this.projectiles.filter(p => !p.done);
+    if (this.phaseTimer >= this.attackDuration) this.endAttack();
+  }
+
+
+  /**
+   * Nouvelle attaque — "animation: spin 2s linear infinite"
+   * Un anneau de couteaux tourne autour du cœur et se resserre progressivement.
+   */
+  private attackKnifeRing(): void {
+    this.attackDuration = 10;
+    this.cssCommandText = "@keyframes spin { to { transform: rotate(360deg); } } .ring { animation: spin 2s linear infinite; }";
+    this.ringAngle  = 0;
+    this.ringRadius = Math.max(this.boxW, this.boxH) * 0.6;
+    const cx = this.boxX + this.boxW / 2, cy = this.boxY + this.boxH / 2;
+    const knifeCount = 8;
+    for (let i = 0; i < knifeCount; i++) {
+      const a = (i / knifeCount) * Math.PI * 2;
+      this.spawnKnife(cx + Math.cos(a) * this.ringRadius, cy + Math.sin(a) * this.ringRadius, 0, 0);
+      const p = this.projectiles[this.projectiles.length - 1];
+      p.anchorOffsetX = a;
+    }
+  }
+
+  private updateKnifeRing(dt: number): void {
+    this.ringAngle  += dt * 1.6;
+    this.ringRadius  = Math.max(20, this.ringRadius - dt * 9);
+    const cx = this.boxX + this.boxW / 2, cy = this.boxY + this.boxH / 2;
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      const a = (p.anchorOffsetX ?? 0) + this.ringAngle;
+      p.x = cx + Math.cos(a) * this.ringRadius;
+      p.y = cy + Math.sin(a) * this.ringRadius;
+      this.checkKnifeCollision(p);
+    }
+    if (this.phaseTimer >= this.attackDuration) {
+      this.projectiles = [];
+      this.endAttack();
+    }
+  }
+
+
+  /**
+   * Nouvelle attaque — "animation-delay: calc(var(--i) * 0.3s)"
+   * Des couteaux sont envoyés depuis les 4 côtés de la boîte, toujours dans le même ordre :
+   * haut → droite → bas → gauche → haut → ...
+   */
+  private attackCssAnimationDelay(): void {
+    this.attackDuration = 11;
+    this.cssCommandText = ".couteau { animation-delay: calc(var(--i) * 0.3s); }";
+    this.clockWaveTimer = 0;
+    this.clockWaveIndex = 0;
+  }
+
+  private updateCssAnimationDelay(dt: number): void {
+    this.clockWaveTimer += dt;
+    if (this.clockWaveTimer >= 0.55 && this.phaseTimer < this.attackDuration - 1.5) {
+      this.clockWaveTimer = 0;
+      const side = this.CLOCK_SIDES[this.clockWaveIndex % this.CLOCK_SIDES.length];
+      this.clockWaveIndex++;
+      const cx = this.boxX + this.boxW / 2, cy = this.boxY + this.boxH / 2;
+      const speed = 100;
+      let x = cx, y = cy, vx = 0, vy = 0;
+      if (side === "top")    { x = cx; y = this.boxY - 20;             vx = 0;      vy = speed;  }
+      if (side === "right")  { x = this.boxX + this.boxW + 20; y = cy; vx = -speed; vy = 0;      }
+      if (side === "bottom") { x = cx; y = this.boxY + this.boxH + 20; vx = 0;      vy = -speed; }
+      if (side === "left")   { x = this.boxX - 20; y = cy;             vx = speed;  vy = 0;      }
+      this.spawnKnife(x, y, vx, vy);
+    }
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      p.x += p.vx * dt * this.speedMultiplier;
+      p.y += p.vy * dt * this.speedMultiplier;
+      this.checkKnifeCollision(p);
+      if (
+        p.x < this.boxX - 40 || p.x > this.boxX + this.boxW + 40 ||
+        p.y < this.boxY - 40 || p.y > this.boxY + this.boxH + 40
+      ) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
     if (this.phaseTimer >= this.attackDuration) this.endAttack();
