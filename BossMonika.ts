@@ -10,8 +10,8 @@ const PLAYER_NAME    = "Psin";
 const PLAYER_LV      = 1;
 const PLAYER_MAX_HP  = 20;
 
-const MONIKA_SPRITE_URL = "/assets/sprites/Monika_boss.png";
-const HEART_SPRITE_URL  = "/assets/sprites/heart.png";
+const MONIKA_SPRITE_URL = "assets/sprites/Monika_boss.png";
+const HEART_SPRITE_URL  = "assets/sprites/heart.png";
 const MONIKA_DISPLAY_W  = 80;
 const MONIKA_DISPLAY_H  = 140;
 

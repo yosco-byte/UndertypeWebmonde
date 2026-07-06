@@ -5,7 +5,7 @@ import { assets } from "./AssetLoader";
 
 export type Direction = "down" | "left" | "right" | "up";
 
-const SPRITE_URL = "/assets/sprites/frisk.png";
+const SPRITE_URL = "assets/sprites/frisk.png";
 const FRAME_W = 19;
 const FRAME_H = 34;
 const DIR_FRAME_COUNT: Record<Direction, number> = {

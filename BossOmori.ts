@@ -15,13 +15,13 @@ const PLAYER_DMG_PERFECT = 4;
 
 const OMORI_MAX_HP = 15;
 
-const OMORI_SPRITE_URL = "/assets/sprites/Omori.png";
+const OMORI_SPRITE_URL = "assets/sprites/Omori.png";
 const OMORI_DISPLAY_W  = 90;
 const OMORI_DISPLAY_H  = 120;
 
-const HEART_SPRITE_URL = "/assets/sprites/heart.png";
+const HEART_SPRITE_URL = "assets/sprites/heart.png";
 
-const BOSS_MUSIC_URL    = "/assets/music/Boss3.mp3";
+const BOSS_MUSIC_URL    = "assets/music/Boss3.mp3";
 const BOSS_MUSIC_VOLUME = 0.6;
 
 const KNIFE_DMG   = 3;

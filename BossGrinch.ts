@@ -10,15 +10,15 @@ const PLAYER_LV = 1;
 const PLAYER_MAX_HP = 20;
 
 
-const GRINCH_SPRITE_URL = "/assets/sprites/grinch_boss_idle.png";
+const GRINCH_SPRITE_URL = "assets/sprites/grinch_boss_idle.png";
 
 
-const GRINCH_ANIM_SHEET_URL = "/assets/sprites/grinch_boss_anim.png";
+const GRINCH_ANIM_SHEET_URL = "assets/sprites/grinch_boss_anim.png";
 const GRINCH_ANIM_FRAME_COUNT = 4;  
 const GRINCH_ANIM_FPS = 1;           
 
 
-const HEART_SPRITE_URL = "/assets/sprites/heart.png";
+const HEART_SPRITE_URL = "assets/sprites/heart.png";
 
 
 const GRINCH_DISPLAY_SIZE = 64;
@@ -290,7 +290,7 @@ export class BossGrinch implements Scene {
     assets.load(HEART_SPRITE_URL).then((img) => { this.heartSprite = img; });
 
   
-    assets.load("/assets/sprites/Monika.png");
+    assets.load("assets/sprites/Monika.png");
 
     
     this.startFade("black", 1, 0, () => {
