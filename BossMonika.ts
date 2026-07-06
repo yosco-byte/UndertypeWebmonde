@@ -15,7 +15,7 @@ const HEART_SPRITE_URL  = "assets/sprites/heart.png";
 const MONIKA_DISPLAY_W  = 80;
 const MONIKA_DISPLAY_H  = 140;
 
-const BOSS_MUSIC_URL    = "assets/music/BossMonika3.mp3";
+const BOSS_MUSIC_URL    = "assets/music/BossMonika.mp3";
 const BOSS_MUSIC_VOLUME = 0.6;
 
 
