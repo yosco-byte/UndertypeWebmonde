@@ -942,8 +942,8 @@ export class BossMonika implements Scene {
     ctx.fillRect(bx, by, bw, bh);
 
   
-    const zoneX = bx + bw * 0.30;
-    const zoneW = bw * 0.40;
+    const zoneX = bx + bw * 0.485;
+    const zoneW = bw * 0.03;
     ctx.fillStyle = "#cc0000";
     ctx.fillRect(zoneX, by, zoneW, bh);
 
