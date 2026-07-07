@@ -70,6 +70,31 @@ const DIALOGUE_INSPECT: DialogueLine[] = [
   { speaker: "Système", text: '  System.out.println; }' },
 ];
 
+// --- Attaque 4 : balises mal orthographiées ---
+const MISSPELLED_TAGS: string[] = [
+  "<dvi>",
+  "<spn>",
+  "</hmtl>",
+  "<bdoy>",
+  "<inptu>",
+  "</tabel>",
+  "<butotn>",
+  "<imge>",
+  "</dvi>",
+  "<hrefe>",
+];
+
+const ATK4_DURATION            = 15;
+const ATK4_SPAWN_INTERVAL      = 0.55;
+const ATK4_SURPRISE_CHANCE     = 0.35;  // proba qu'une balise grossisse d'un coup
+const ATK4_SURPRISE_SCALE      = 4;     // facteur de grossissement (x4)
+const ATK4_SURPRISE_MIN_DELAY  = 0.4;   // délai min avant la surprise (secondes après l'apparition)
+const ATK4_SURPRISE_MAX_DELAY  = 1.4;   // délai max avant la surprise
+
+
+const DIALOGUE_AFTER_ATK4: DialogueLine[] = [];
+
+
 const DIALOGUE_VICTORY: DialogueLine[] = [];
 
 
@@ -87,6 +112,8 @@ type Phase =
   | "dialogueAfterAtk2"
   | "attack3"          
   | "dialogueAfterAtk3"
+  | "attack4"          
+  | "dialogueAfterAtk4"
   | "playerTurn2"
   | "fightRhythm2"
   | "actMenu2"
@@ -101,6 +128,22 @@ interface FleurStar {
   vx: number;
   vy: number;
   life: number;
+  done: boolean;
+}
+
+
+interface MisspelledTag {
+  text: string;
+  x: number;
+  y: number;
+  startX: number;
+  speedY: number;
+  zigzagAmp: number;
+  zigzagFreq: number;
+  time: number;
+  scale: number;        // 1 = taille normale, monte à ATK4_SURPRISE_SCALE
+  surpriseAt: number;   // instant (en secondes depuis l'apparition) où elle grossit d'un coup
+  surprised: boolean;   // a-t-elle déjà grossi ?
   done: boolean;
 }
 
@@ -257,6 +300,8 @@ export class BossMonika implements Scene {
   private monikaY = 0;
   private monikaHitsLeft = MONIKA_MAX_HITS;  
 
+  private bossMusic: HTMLAudioElement | null = null;
+
   
   private fallingTags: FallingTag[] = [];
   private atk1Timer = 0;
@@ -280,7 +325,12 @@ export class BossMonika implements Scene {
   private fleurCurrentY = 0;     // position Y du gros mot pendant la descente
   private fleurStars: FleurStar[] = [];
 
-  // Rotation des attaques après la première (attack1 = intro) : alterne attack2 / attack3
+  // Attaque 4 — balises mal orthographiées avec effet de surprise (x4)
+  private misspelledTags: MisspelledTag[] = [];
+  private atk4Timer = 0;
+  private atk4SpawnTimer = 0;
+
+  // Rotation des attaques après la première (attack1 = intro) : alterne attack2 / attack3 / attack4
   private attackIndex = -1;
 
   
@@ -342,6 +392,11 @@ export class BossMonika implements Scene {
     assets.load(MONIKA_SPRITE_URL).then(img => { this.monikaSprite = img; });
     assets.load(HEART_SPRITE_URL).then(img  => { this.heartSprite  = img; });
 
+    this.bossMusic = new Audio(BOSS_MUSIC_URL);
+    this.bossMusic.loop = true;
+    this.bossMusic.volume = BOSS_MUSIC_VOLUME;
+    this.bossMusic.play().catch(() => {});
+
    
     this.startFade("black", 1, 0, () => {
       this.phase = "dialogueIntro";
@@ -349,7 +404,17 @@ export class BossMonika implements Scene {
     });
   }
 
-  onExit(): void {}
+  onExit(): void {
+    this.stopMusic();
+  }
+
+  private stopMusic(): void {
+    if (this.bossMusic) {
+      this.bossMusic.pause();
+      this.bossMusic.currentTime = 0;
+      this.bossMusic = null;
+    }
+  }
 
 
 
@@ -543,14 +608,17 @@ export class BossMonika implements Scene {
 
 
 
-  // Alterne entre l'attaque 2 (balises rebondissantes) et l'attaque 3 (FLEUR)
-  // pour que Monika ne répète plus indéfiniment la même attaque.
+  // Alterne entre l'attaque 2 (balises rebondissantes), l'attaque 3 (FLEUR)
+  // et l'attaque 4 (balises mal orthographiées surprises) pour que Monika
+  // ne répète plus indéfiniment la même attaque.
   private startNextAttack(): void {
-    this.attackIndex = (this.attackIndex + 1) % 2;
+    this.attackIndex = (this.attackIndex + 1) % 3;
     if (this.attackIndex === 0) {
       this.startAttack2();
-    } else {
+    } else if (this.attackIndex === 1) {
       this.startAttack3();
+    } else {
+      this.startAttack4();
     }
   }
 
@@ -768,7 +836,92 @@ export class BossMonika implements Scene {
     }
   }
 
+
+  // --- Attaque 4 : balises mal orthographiées ---
+  // Des balises invalides tombent vers le joueur (toutes dangereuses).
+  // Certaines, tirées au sort, grossissent brusquement (x4) après un court
+  // délai pour surprendre le joueur en plein esquive.
+  private startAttack4(): void {
+    this.phase = "attack4";
+    this.atk4Timer = 0;
+    this.atk4SpawnTimer = 0;
+    this.misspelledTags = [];
+    this.heartX = this.boxX + this.boxW / 2;
+    this.heartY = this.boxY + this.boxH / 2;
+  }
+
+  private spawnMisspelledTag(): void {
+    const text = MISSPELLED_TAGS[Math.floor(Math.random() * MISSPELLED_TAGS.length)];
+    const startX = this.boxX + 20 + Math.random() * (this.boxW - 40);
+    const willSurprise = Math.random() < ATK4_SURPRISE_CHANCE;
+    this.misspelledTags.push({
+      text,
+      x: startX,
+      y: this.boxY - 10,
+      startX,
+      speedY: 55 + Math.random() * 35,
+      zigzagAmp: 15 + Math.random() * 20,
+      zigzagFreq: 1.5 + Math.random() * 2,
+      time: 0,
+      scale: 1,
+      surpriseAt: willSurprise
+        ? ATK4_SURPRISE_MIN_DELAY + Math.random() * (ATK4_SURPRISE_MAX_DELAY - ATK4_SURPRISE_MIN_DELAY)
+        : -1, // -1 = ne grossira jamais
+      surprised: false,
+      done: false,
+    });
+  }
+
+  private updateAttack4(dt: number): void {
+    this.atk4Timer      += dt;
+    this.atk4SpawnTimer += dt;
+
+    if (this.atk4SpawnTimer >= ATK4_SPAWN_INTERVAL) {
+      this.atk4SpawnTimer = 0;
+      this.spawnMisspelledTag();
+    }
+
+    for (const tag of this.misspelledTags) {
+      if (tag.done) continue;
+      tag.time += dt;
+      tag.y    += tag.speedY * dt;
+      tag.x     = tag.startX + Math.sin(tag.time * tag.zigzagFreq) * tag.zigzagAmp;
+
+      // Effet de surprise : grossissement brutal et soudain (x4)
+      if (!tag.surprised && tag.surpriseAt >= 0 && tag.time >= tag.surpriseAt) {
+        tag.surprised = true;
+        tag.scale = ATK4_SURPRISE_SCALE;
+        this.triggerShake(0.15, 5);
+      }
+
+      if (tag.y > this.boxY + this.boxH + 10) {
+        tag.done = true;
+        continue;
+      }
+
+      tag.x = Math.max(this.boxX + 5, Math.min(this.boxX + this.boxW - 5, tag.x));
+
+      // Le rayon de collision grandit avec la taille de la balise
+      const dist = Math.hypot(tag.x - this.heartX, tag.y - this.heartY);
+      if (dist < this.HEART_SIZE * ((tag.scale - 1) * 0.5 + 1)) {
+        tag.done = true;
+        this.hp    = Math.max(0, this.hp - DMG_BAD);
+        this.score += SCORE_BAD;
+        this.triggerShake(0.35, 7);
+      }
+    }
+
+    this.misspelledTags = this.misspelledTags.filter(t => !t.done);
+
+    if (this.atk4Timer >= ATK4_DURATION) {
+      this.misspelledTags = [];
+      this.phase = "dialogueAfterAtk4";
+      this.dialogue.start(DIALOGUE_AFTER_ATK4, () => this.startPlayerTurn(true));
+    }
+  }
+
   private endBattle(victory = false): void {
+    this.stopMusic();
     if (victory) {
       gameState.monikaDefeated = true;
     
@@ -858,6 +1011,14 @@ export class BossMonika implements Scene {
         break;
 
       case "dialogueAfterAtk3":
+        break;
+
+      case "attack4":
+        this.updateAttack4(dt);
+        this.updateHeartMovement(dt);
+        break;
+
+      case "dialogueAfterAtk4":
         break;
 
       case "playerTurn2":
@@ -1009,6 +1170,16 @@ export class BossMonika implements Scene {
 
     if (this.phase === "attack3") {
       this.renderFleurAttack(ctx);
+    }
+
+    if (this.phase === "attack4") {
+      for (const tag of this.misspelledTags) {
+        const fontSize = Math.round(13 * tag.scale);
+        ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
+        ctx.fillStyle = tag.surprised ? "#ff5555" : "#e0e0e0";
+        ctx.fillText(tag.text, tag.x - ctx.measureText(tag.text).width / 2, tag.y);
+      }
+      ctx.font = "bold 13px 'Courier New', monospace";
     }
   }
 
