@@ -207,6 +207,14 @@ export class BossOmori implements Scene {
   private boxX = 0;
   private boxY = 0;
 
+  // Dimensions de la box "normale" (scale = 1), utilisées pour faire venir
+  // les couteaux de loin même quand la box est rétrécie (attaque CSS shrink),
+  // afin de laisser au joueur le temps de les voir arriver.
+  private get fullBoxW(): number { return this.baseBoxW; }
+  private get fullBoxH(): number { return this.baseBoxH; }
+  private get fullBoxX(): number { return (this.viewportW - this.fullBoxW) / 2; }
+  private get fullBoxY(): number { return this.boxY; }
+
   private heartX = 0;
   private heartY = 0;
   private readonly HEART_SIZE = 16;
@@ -678,12 +686,18 @@ export class BossOmori implements Scene {
     if (this.shrinkTimer >= 0.45 && this.phaseTimer < this.attackDuration - 0.5) {
       this.shrinkTimer = 0;
 
+      // Les couteaux partent des bords de la box "normale" (comme si elle
+      // n'était pas rétrécie), pour laisser au joueur le temps de les voir
+      // venir même si la box affichée est petite. Seule la cible finale se
+      // trouve dans la box réellement rétrécie.
+      const fbx = this.fullBoxX, fby = this.fullBoxY, fbw = this.fullBoxW, fbh = this.fullBoxH;
+
       const side = Math.floor(Math.random() * 4);
       let sx: number, sy: number;
-      if (side === 0) { sx = this.boxX + Math.random() * this.boxW; sy = this.boxY; }
-      else if (side === 1) { sx = this.boxX + Math.random() * this.boxW; sy = this.boxY + this.boxH; }
-      else if (side === 2) { sx = this.boxX; sy = this.boxY + Math.random() * this.boxH; }
-      else { sx = this.boxX + this.boxW; sy = this.boxY + Math.random() * this.boxH; }
+      if (side === 0) { sx = fbx + Math.random() * fbw; sy = fby; }
+      else if (side === 1) { sx = fbx + Math.random() * fbw; sy = fby + fbh; }
+      else if (side === 2) { sx = fbx; sy = fby + Math.random() * fbh; }
+      else { sx = fbx + fbw; sy = fby + Math.random() * fbh; }
 
       const targetX = this.boxX + 0.2 * this.boxW + Math.random() * this.boxW * 0.6;
       const targetY = this.boxY + 0.2 * this.boxH + Math.random() * this.boxH * 0.6;
@@ -699,8 +713,8 @@ export class BossOmori implements Scene {
       p.y += p.vy * dt * this.speedMultiplier;
       this.checkKnifeCollision(p);
       if (
-        p.x < this.boxX - 20 || p.x > this.boxX + this.boxW + 20 ||
-        p.y < this.boxY - 20 || p.y > this.boxY + this.boxH + 20
+        p.x < this.fullBoxX - 20 || p.x > this.fullBoxX + this.fullBoxW + 20 ||
+        p.y < this.fullBoxY - 20 || p.y > this.fullBoxY + this.fullBoxH + 20
       ) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
