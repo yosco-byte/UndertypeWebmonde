@@ -70,8 +70,8 @@ const DIALOGUE_INSPECT: DialogueLine[] = [
   { speaker: "Système", text: '  System.out.println; }' },
 ];
 
-// --- Attaque 4 : balises mal orthographiées ---
-const MISSPELLED_TAGS: string[] = [
+// --- Attaque 4 : balises mal orthographiées (dégâts) + bonnes balises (score) ---
+const MISSPELLED_TAGS_BAD: string[] = [
   "<dvi>",
   "<spn>",
   "</hmtl>",
@@ -84,10 +84,19 @@ const MISSPELLED_TAGS: string[] = [
   "<hrefe>",
 ];
 
+const MISSPELLED_TAGS_GOOD: string[] = [
+  "<p>",
+  "<div>",
+  "</p>",
+  "<span>",
+  "</div>",
+];
+
 const ATK4_DURATION            = 15;
 const ATK4_SPAWN_INTERVAL      = 0.55;
-const ATK4_SURPRISE_CHANCE     = 0.35;  // proba qu'une balise grossisse d'un coup
-const ATK4_SURPRISE_SCALE      = 4;     // facteur de grossissement (x4)
+const ATK4_GOOD_CHANCE         = 0.3;   // proba qu'une balise apparue soit une bonne balise (score)
+const ATK4_SURPRISE_CHANCE     = 0.35;  // proba qu'une balise mauvaise grossisse d'un coup (les bonnes ne grossissent jamais)
+const ATK4_SURPRISE_SCALE      = 2;     // facteur de grossissement (x2)
 const ATK4_SURPRISE_MIN_DELAY  = 0.4;   // délai min avant la surprise (secondes après l'apparition)
 const ATK4_SURPRISE_MAX_DELAY  = 1.4;   // délai max avant la surprise
 
@@ -96,6 +105,10 @@ const DIALOGUE_AFTER_ATK4: DialogueLine[] = [];
 
 
 const DIALOGUE_VICTORY: DialogueLine[] = [];
+
+const DIALOGUE_GAMEOVER: DialogueLine[] = [
+  { speaker: "Monika", text: "Je suis désolé, mon ami... Nous nous reverrons." },
+];
 
 
 type Phase =
@@ -119,6 +132,7 @@ type Phase =
   | "actMenu2"
   | "inspectDialogue2"
   | "victory"
+  | "gameOver"
   | "fadeOutWhite";
 
 
@@ -134,6 +148,7 @@ interface FleurStar {
 
 interface MisspelledTag {
   text: string;
+  bad: boolean;
   x: number;
   y: number;
   startX: number;
@@ -507,6 +522,7 @@ export class BossMonika implements Scene {
           this.hp    = Math.max(0, this.hp - DMG_BAD);
           this.score += SCORE_BAD;
           this.triggerShake(0.35, 7);
+          if (this.hp <= 0) this.triggerGameOver();
         } else {
           this.score += SCORE_GOOD;
         }
@@ -709,6 +725,7 @@ export class BossMonika implements Scene {
           this.hp    = Math.max(0, this.hp - DMG_BAD);
           this.score += SCORE_BAD;
           this.triggerShake(0.35, 7);
+          if (this.hp <= 0) this.triggerGameOver();
         } else {
           this.score += SCORE_GOOD;
         }
@@ -818,6 +835,7 @@ export class BossMonika implements Scene {
             this.hp = Math.max(0, this.hp - DMG_BAD);
             this.score += SCORE_BAD;
             this.triggerShake(0.35, 7);
+            if (this.hp <= 0) this.triggerGameOver();
           }
         }
         this.fleurStars = this.fleurStars.filter(s => !s.done);
@@ -838,9 +856,10 @@ export class BossMonika implements Scene {
 
 
   // --- Attaque 4 : balises mal orthographiées ---
-  // Des balises invalides tombent vers le joueur (toutes dangereuses).
-  // Certaines, tirées au sort, grossissent brusquement (x4) après un court
-  // délai pour surprendre le joueur en plein esquive.
+  // Des balises invalides tombent vers le joueur (dégâts), mélangées à de
+  // bonnes balises (bonus de score). Certaines mauvaises balises, tirées au
+  // sort, doublent de taille brusquement après un court délai pour
+  // surprendre le joueur en plein esquive.
   private startAttack4(): void {
     this.phase = "attack4";
     this.atk4Timer = 0;
@@ -851,11 +870,14 @@ export class BossMonika implements Scene {
   }
 
   private spawnMisspelledTag(): void {
-    const text = MISSPELLED_TAGS[Math.floor(Math.random() * MISSPELLED_TAGS.length)];
+    const isGood = Math.random() < ATK4_GOOD_CHANCE;
+    const pool = isGood ? MISSPELLED_TAGS_GOOD : MISSPELLED_TAGS_BAD;
+    const text = pool[Math.floor(Math.random() * pool.length)];
     const startX = this.boxX + 20 + Math.random() * (this.boxW - 40);
-    const willSurprise = Math.random() < ATK4_SURPRISE_CHANCE;
+    const willSurprise = !isGood && Math.random() < ATK4_SURPRISE_CHANCE;
     this.misspelledTags.push({
       text,
+      bad: !isGood,
       x: startX,
       y: this.boxY - 10,
       startX,
@@ -887,7 +909,7 @@ export class BossMonika implements Scene {
       tag.y    += tag.speedY * dt;
       tag.x     = tag.startX + Math.sin(tag.time * tag.zigzagFreq) * tag.zigzagAmp;
 
-      // Effet de surprise : grossissement brutal et soudain (x4)
+      // Effet de surprise : grossissement brutal et soudain (x2), mauvaises balises seulement
       if (!tag.surprised && tag.surpriseAt >= 0 && tag.time >= tag.surpriseAt) {
         tag.surprised = true;
         tag.scale = ATK4_SURPRISE_SCALE;
@@ -905,9 +927,14 @@ export class BossMonika implements Scene {
       const dist = Math.hypot(tag.x - this.heartX, tag.y - this.heartY);
       if (dist < this.HEART_SIZE * ((tag.scale - 1) * 0.5 + 1)) {
         tag.done = true;
-        this.hp    = Math.max(0, this.hp - DMG_BAD);
-        this.score += SCORE_BAD;
-        this.triggerShake(0.35, 7);
+        if (tag.bad) {
+          this.hp    = Math.max(0, this.hp - DMG_BAD);
+          this.score += SCORE_BAD;
+          this.triggerShake(0.35, 7);
+          if (this.hp <= 0) this.triggerGameOver();
+        } else {
+          this.score += SCORE_GOOD;
+        }
       }
     }
 
@@ -918,6 +945,15 @@ export class BossMonika implements Scene {
       this.phase = "dialogueAfterAtk4";
       this.dialogue.start(DIALOGUE_AFTER_ATK4, () => this.startPlayerTurn(true));
     }
+  }
+
+  private triggerGameOver(): void {
+    this.phase = "gameOver";
+    this.fallingTags = [];
+    this.bouncingTags = [];
+    this.fleurStars = [];
+    this.misspelledTags = [];
+    this.dialogue.start(DIALOGUE_GAMEOVER, () => this.endBattle(false));
   }
 
   private endBattle(victory = false): void {
@@ -1176,7 +1212,7 @@ export class BossMonika implements Scene {
       for (const tag of this.misspelledTags) {
         const fontSize = Math.round(13 * tag.scale);
         ctx.font = `bold ${fontSize}px 'Courier New', monospace`;
-        ctx.fillStyle = tag.surprised ? "#ff5555" : "#e0e0e0";
+        ctx.fillStyle = !tag.bad ? "#7CFC9A" : (tag.surprised ? "#ff5555" : "#e0e0e0");
         ctx.fillText(tag.text, tag.x - ctx.measureText(tag.text).width / 2, tag.y);
       }
       ctx.font = "bold 13px 'Courier New', monospace";
