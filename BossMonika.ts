@@ -41,6 +41,18 @@ const DMG_BAD     = 3;
 const MONIKA_MAX_HITS = 10;
 
 
+// --- Attaque 3 : FLEUR ---
+const FLEUR_WORD               = "FLEUR";
+const FLEUR_HASH                = "#";
+const FLEUR_CONVERGE_DURATION   = 0.9;  // temps pour que "FLEUR" et "#" se rejoignent
+const FLEUR_DISPLAY_DURATION    = 0.5;  // temps d'affichage du gros mot (36px) avant qu'il descende
+const FLEUR_DESCEND_DURATION    = 1.1;  // temps de descente vers le centre de la box
+const FLEUR_STAR_COUNT          = 14;   // nombre d'étoiles libérées à l'explosion
+const FLEUR_STAR_SPEED          = 150;
+const FLEUR_STAR_LIFETIME       = 2.2;
+const FLEUR_END_DELAY           = 0.4;  // petit délai après la disparition des étoiles
+
+
 const DIALOGUE_INTRO: DialogueLine[] = [
   { speaker: "Monika", text: "Tu veux partir à ce point ?" },
 ];
@@ -48,6 +60,8 @@ const DIALOGUE_INTRO: DialogueLine[] = [
 const DIALOGUE_AFTER_ATK1: DialogueLine[] = [];
 
 const DIALOGUE_AFTER_ATK2: DialogueLine[] = [];
+
+const DIALOGUE_AFTER_ATK3: DialogueLine[] = [];
 
 const DIALOGUE_INSPECT: DialogueLine[] = [
   { speaker: "Système", text: 'if (action.isSelected(Menu.ANALYZE)) {' },
@@ -71,12 +85,24 @@ type Phase =
   | "dialogueAfterAct"
   | "attack2"          
   | "dialogueAfterAtk2"
+  | "attack3"          
+  | "dialogueAfterAtk3"
   | "playerTurn2"
   | "fightRhythm2"
   | "actMenu2"
   | "inspectDialogue2"
   | "victory"
   | "fadeOutWhite";
+
+
+interface FleurStar {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  done: boolean;
+}
 
 
 interface FallingTag {
@@ -244,6 +270,19 @@ export class BossMonika implements Scene {
   private readonly BOUNCE_SPAWN_INTERVAL = 0.5;
   private atk2SpawnTimer = 0;
 
+  // Attaque 3 — FLEUR
+  private fleurSubPhase: "converge" | "display" | "descend" | "explode" | "done" = "converge";
+  private fleurTimer = 0;
+  private fleurTargetX = 0;
+  private fleurTargetY = 0;      // point de convergence, juste sous Monika
+  private fleurWordX = 0;        // position courante du morceau "FLEUR" (vient de la droite)
+  private fleurHashX = 0;        // position courante du morceau "#" (vient de la gauche)
+  private fleurCurrentY = 0;     // position Y du gros mot pendant la descente
+  private fleurStars: FleurStar[] = [];
+
+  // Rotation des attaques après la première (attack1 = intro) : alterne attack2 / attack3
+  private attackIndex = -1;
+
   
   private rhythmBarPos   = 0;       // 0..1 = position de la barre
   private rhythmBarDir   = 1;       // sens de déplacement
@@ -298,6 +337,7 @@ export class BossMonika implements Scene {
     this.phase          = "fadeIn";
     this.fadeAlpha      = 1;
     this.fadeColor      = "black";
+    this.attackIndex    = -1;
 
     assets.load(MONIKA_SPRITE_URL).then(img => { this.monikaSprite = img; });
     assets.load(HEART_SPRITE_URL).then(img  => { this.heartSprite  = img; });
@@ -449,7 +489,7 @@ export class BossMonika implements Scene {
           this.phase = "victory";
           this.dialogue.start(DIALOGUE_VICTORY, () => this.endBattle(true));
         } else {
-          this.startAttack2();
+          this.startNextAttack();
         }
       }
       return;
@@ -486,16 +526,12 @@ export class BossMonika implements Scene {
         
         this.phase = second ? "inspectDialogue2" : "inspectDialogue";
         this.dialogue.start(DIALOGUE_INSPECT, () => {
-          this.startAttack2();
+          this.startNextAttack();
         });
       } else {
         const talkLine: DialogueLine[] = [{ speaker: "Monika", text: "test" }];
         this.dialogue.start(talkLine, () => {
-          if (second) {
-            this.startAttack2();
-          } else {
-            this.startAttack2();
-          }
+          this.startNextAttack();
         });
         this.phase = second ? "inspectDialogue2" : "inspectDialogue";
       }
@@ -506,6 +542,17 @@ export class BossMonika implements Scene {
   }
 
 
+
+  // Alterne entre l'attaque 2 (balises rebondissantes) et l'attaque 3 (FLEUR)
+  // pour que Monika ne répète plus indéfiniment la même attaque.
+  private startNextAttack(): void {
+    this.attackIndex = (this.attackIndex + 1) % 2;
+    if (this.attackIndex === 0) {
+      this.startAttack2();
+    } else {
+      this.startAttack3();
+    }
+  }
 
   private startAttack2(): void {
     this.phase         = "attack2";
@@ -609,6 +656,118 @@ export class BossMonika implements Scene {
     }
   }
 
+
+  // --- Attaque 3 : FLEUR ---
+  // "FLEUR" arrive depuis la droite, "#" depuis la gauche, ils se rejoignent
+  // sous Monika pour former le gros mot "FLEUR" (36px). Le mot descend ensuite
+  // jusqu'au centre de la box, puis explose en libérant des étoiles qui
+  // traversent toute la zone de combat.
+  private startAttack3(): void {
+    this.phase = "attack3";
+    this.fleurSubPhase = "converge";
+    this.fleurTimer = 0;
+    this.fleurStars = [];
+    this.fleurTargetX = this.monikaX;
+    this.fleurTargetY = this.monikaY + 16; // juste sous Monika
+    this.fleurCurrentY = this.fleurTargetY;
+    this.fleurWordX = this.viewportW + 60;
+    this.fleurHashX = -60;
+    this.heartX = this.boxX + this.boxW / 2;
+    this.heartY = this.boxY + this.boxH / 2;
+  }
+
+  private spawnFleurStars(): void {
+    this.fleurStars = [];
+    const cx = this.boxX + this.boxW / 2;
+    const cy = this.boxY + this.boxH / 2;
+    for (let i = 0; i < FLEUR_STAR_COUNT; i++) {
+      const angle = (Math.PI * 2 * i) / FLEUR_STAR_COUNT + Math.random() * 0.2;
+      const speed = FLEUR_STAR_SPEED * (0.8 + Math.random() * 0.4);
+      this.fleurStars.push({
+        x: cx,
+        y: cy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        life: FLEUR_STAR_LIFETIME,
+        done: false,
+      });
+    }
+    this.triggerShake(0.4, 10);
+  }
+
+  private updateAttack3(dt: number): void {
+    this.fleurTimer += dt;
+
+    switch (this.fleurSubPhase) {
+      case "converge": {
+        const t = Math.min(1, this.fleurTimer / FLEUR_CONVERGE_DURATION);
+        const startWordX = this.viewportW + 60;
+        const startHashX = -60;
+        this.fleurWordX = startWordX + (this.fleurTargetX - startWordX) * t;
+        this.fleurHashX = startHashX + (this.fleurTargetX - startHashX) * t;
+        if (t >= 1) {
+          this.fleurSubPhase = "display";
+          this.fleurTimer = 0;
+        }
+        break;
+      }
+      case "display": {
+        if (this.fleurTimer >= FLEUR_DISPLAY_DURATION) {
+          this.fleurSubPhase = "descend";
+          this.fleurTimer = 0;
+          this.fleurCurrentY = this.fleurTargetY;
+        }
+        break;
+      }
+      case "descend": {
+        const t = Math.min(1, this.fleurTimer / FLEUR_DESCEND_DURATION);
+        const boxMidY = this.boxY + this.boxH / 2;
+        this.fleurCurrentY = this.fleurTargetY + (boxMidY - this.fleurTargetY) * t;
+        if (t >= 1) {
+          this.spawnFleurStars();
+          this.fleurSubPhase = "explode";
+          this.fleurTimer = 0;
+        }
+        break;
+      }
+      case "explode": {
+        for (const star of this.fleurStars) {
+          if (star.done) continue;
+          star.x += star.vx * dt;
+          star.y += star.vy * dt;
+          star.life -= dt;
+
+          if (star.x < this.boxX + 4) { star.x = this.boxX + 4; star.vx *= -1; }
+          if (star.x > this.boxX + this.boxW - 4) { star.x = this.boxX + this.boxW - 4; star.vx *= -1; }
+          if (star.y < this.boxY + 4) { star.y = this.boxY + 4; star.vy *= -1; }
+          if (star.y > this.boxY + this.boxH - 4) { star.y = this.boxY + this.boxH - 4; star.vy *= -1; }
+
+          if (star.life <= 0) { star.done = true; continue; }
+
+          const dist = Math.hypot(star.x - this.heartX, star.y - this.heartY);
+          if (dist < this.HEART_SIZE) {
+            star.done = true;
+            this.hp = Math.max(0, this.hp - DMG_BAD);
+            this.score += SCORE_BAD;
+            this.triggerShake(0.35, 7);
+          }
+        }
+        this.fleurStars = this.fleurStars.filter(s => !s.done);
+
+        if (this.fleurStars.length === 0 && this.fleurTimer >= FLEUR_END_DELAY) {
+          this.fleurSubPhase = "done";
+        }
+        break;
+      }
+      case "done": {
+        this.fleurStars = [];
+        this.phase = "dialogueAfterAtk3";
+        this.dialogue.start(DIALOGUE_AFTER_ATK3, () => this.startPlayerTurn(true));
+        break;
+      }
+    }
+  }
+
   private endBattle(victory = false): void {
     if (victory) {
       gameState.monikaDefeated = true;
@@ -691,6 +850,14 @@ export class BossMonika implements Scene {
       case "attack2":
         this.updateAttack2(dt);
         this.updateHeartMovement(dt);
+        break;
+
+      case "attack3":
+        this.updateAttack3(dt);
+        this.updateHeartMovement(dt);
+        break;
+
+      case "dialogueAfterAtk3":
         break;
 
       case "playerTurn2":
@@ -839,6 +1006,38 @@ export class BossMonika implements Scene {
         ctx.fillText(tag.text, tag.x - ctx.measureText(tag.text).width / 2, tag.y);
       }
     }
+
+    if (this.phase === "attack3") {
+      this.renderFleurAttack(ctx);
+    }
+  }
+
+  private renderFleurAttack(ctx: CanvasRenderingContext2D): void {
+    ctx.textAlign = "center";
+
+    if (this.fleurSubPhase === "converge") {
+      ctx.font = "bold 20px 'Courier New', monospace";
+      ctx.fillStyle = "#ffb6d9";
+      ctx.fillText(FLEUR_WORD, this.fleurWordX, this.fleurTargetY);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(FLEUR_HASH, this.fleurHashX, this.fleurTargetY);
+    } else if (this.fleurSubPhase === "display") {
+      ctx.font = "bold 36px 'Courier New', monospace";
+      ctx.fillStyle = "#ffb6d9";
+      ctx.fillText(FLEUR_WORD, this.fleurTargetX, this.fleurTargetY);
+    } else if (this.fleurSubPhase === "descend") {
+      ctx.font = "bold 36px 'Courier New', monospace";
+      ctx.fillStyle = "#ffb6d9";
+      ctx.fillText(FLEUR_WORD, this.fleurTargetX, this.fleurCurrentY);
+    } else if (this.fleurSubPhase === "explode" || this.fleurSubPhase === "done") {
+      ctx.font = "bold 15px 'Courier New', monospace";
+      ctx.fillStyle = "#ffd700";
+      for (const star of this.fleurStars) {
+        ctx.fillText("★", star.x, star.y);
+      }
+    }
+
+    ctx.textAlign = "left";
   }
 
   private renderHUD(ctx: CanvasRenderingContext2D): void {
