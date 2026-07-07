@@ -28,7 +28,7 @@ const SCORE_GOOD  = 500;
 const SCORE_BAD   = -1000;
 const TAG_DMG_BAD = 3;
 
-const MAX_ATTACKS = 15;
+const MAX_ATTACKS = 16;
 
 const ALL_TAGS_GOOD = ["<p>", "<div>", "</p>", "<span>", "</div>"];
 const ALL_TAGS_BAD  = ["<div", "<p>>", "<<span>", "</br/>", "<html>>"];
@@ -494,6 +494,7 @@ export class BossOmori implements Scene {
       () => this.attackTagsRain(),
       () => this.attackCssColor(),
       () => this.attackCssShrink(),
+      () => this.attackTagBarrage(),
       () => this.attackCssFlexDirection(),
       () => this.attackKnifeCross(),
       () => this.attackCssOpacity(),
@@ -720,6 +721,53 @@ export class BossOmori implements Scene {
     this.projectiles = this.projectiles.filter(p => !p.done);
 
     if (this.phaseTimer >= this.attackDuration) this.endAttack();
+  }
+
+
+  /**
+   * Nouvelle attaque — rafale de balises (cœur doublé)
+   * Le cœur double de taille (hitbox agrandie en conséquence) et Omori
+   * envoie une rafale dense de bonnes et mauvaises balises, en colonnes avec
+   * un "trou" garanti à chaque salve pour que l'esquive reste possible.
+   */
+  private tagBarrageTimer = 0;
+  private readonly TAG_BARRAGE_INTERVAL = 0.4;
+  private readonly TAG_BARRAGE_COLUMNS  = 6;
+
+  private attackTagBarrage(): void {
+    this.attackDuration = 12;
+    this.cssCommandText = ".heart { transform: scale(2); } /* rafale de balises */";
+    this.heartScale = 2;
+    this.tagBarrageTimer = 0;
+  }
+
+  private updateTagBarrage(dt: number): void {
+    this.tagBarrageTimer += dt;
+    if (this.tagBarrageTimer >= this.TAG_BARRAGE_INTERVAL && this.phaseTimer < this.attackDuration - 1.2) {
+      this.tagBarrageTimer = 0;
+
+      const columns = this.TAG_BARRAGE_COLUMNS;
+      // Au moins une colonne "sûre" par salve, sans balise, pour garder l'esquive possible.
+      const gapIndex = Math.floor(Math.random() * columns);
+
+      for (let i = 0; i < columns; i++) {
+        if (i === gapIndex) continue;
+        const x   = this.boxX + ((i + 0.5) / columns) * this.boxW;
+        const bad = Math.random() < 0.65; // majorité de mauvaises pour la pression, mais des bonnes aussi
+        this.spawnTag(x, this.boxY - 20, (Math.random() - 0.5) * 10, 85 + Math.random() * 25, bad);
+      }
+    }
+
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      p.x += p.vx * dt * this.speedMultiplier;
+      p.y += p.vy * dt * this.speedMultiplier;
+      this.checkTagCollision(p);
+      if (p.y > this.boxY + this.boxH + 30) p.done = true;
+    }
+    this.projectiles = this.projectiles.filter(p => !p.done);
+
+    if (this.phaseTimer >= this.attackDuration && this.projectiles.length === 0) this.endAttack();
   }
 
 
@@ -1180,22 +1228,23 @@ export class BossOmori implements Scene {
 
   private updateCurrentAttack(dt: number): void {
     const index = this.attacksUsed - 1;
-    switch (index % 15) {
+    switch (index % 16) {
       case 0: this.updateKnifeWave(dt); break;
       case 1: this.updateTagsRain(dt); break;
       case 2: this.updateCssColor(dt); break;
       case 3: this.updateCssShrink(dt); break;
-      case 4: this.updateCssFlexDirection(dt); break;
-      case 5: this.updateKnifeCross(dt); break;
-      case 6: this.updateCssOpacity(dt); break;
-      case 7: this.updateCssRotate(dt); break;
-      case 8: this.updateTagsSpiral(dt); break;
-      case 9: this.updateFinalCombo(dt); break;
-      case 10: this.updateCssScale(dt); break;
-      case 11: this.updateCssGrid(dt); break;
-      case 12: this.updateCssTransition(dt); break;
-      case 13: this.updateKnifeRing(dt); break;
-      case 14: this.updateCssAnimationDelay(dt); break;
+      case 4: this.updateTagBarrage(dt); break;
+      case 5: this.updateCssFlexDirection(dt); break;
+      case 6: this.updateKnifeCross(dt); break;
+      case 7: this.updateCssOpacity(dt); break;
+      case 8: this.updateCssRotate(dt); break;
+      case 9: this.updateTagsSpiral(dt); break;
+      case 10: this.updateFinalCombo(dt); break;
+      case 11: this.updateCssScale(dt); break;
+      case 12: this.updateCssGrid(dt); break;
+      case 13: this.updateCssTransition(dt); break;
+      case 14: this.updateKnifeRing(dt); break;
+      case 15: this.updateCssAnimationDelay(dt); break;
     }
   }
 
