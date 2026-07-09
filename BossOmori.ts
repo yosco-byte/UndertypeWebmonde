@@ -12,7 +12,7 @@ const PLAYER_MAX_HP  = 25;
 const PLAYER_DMG_NORMAL  = 2;
 const PLAYER_DMG_PERFECT = 4;
 
-const OMORI_MAX_HP = 15;
+const OMORI_MAX_HP = 25;
 
 const OMORI_SPRITE_URL = "assets/sprites/Omori.png";
 const OMORI_DISPLAY_W  = 90;
