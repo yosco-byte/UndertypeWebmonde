@@ -725,49 +725,50 @@ export class BossOmori implements Scene {
 
 
   /**
-   * Chute classique — un mélange de couteaux et de bonnes/mauvaises balises
-   * tombent un par un depuis le haut de la box, comme au tout début du
-   * combat. Toujours largement esquivable : un seul projectile à la fois,
-   * à intervalle confortable.
+   * Pluie de mauvaises balises sous pression — cœur doublé de taille,
+   * uniquement des mauvaises balises, envoyées par vagues de 2 à 3 à la fois
+   * en continu pendant 10 secondes. Des colonnes restent toujours libres à
+   * chaque vague pour garder l'esquive possible : difficile, pas impossible.
    */
-  private knifeFallTimer = 0;
-  private knifeFallCount = 0;
-  private readonly KNIFE_FALL_INTERVAL = 0.9;
-  private readonly KNIFE_FALL_TOTAL = 6;
+  private tagBarrageTimer = 0;
+  private readonly TAG_BARRAGE_INTERVAL = 0.6;
+  private readonly TAG_BARRAGE_COLUMNS = 5;
 
   private attackTagBarrage(): void {
-    this.attackDuration = 8;
+    this.attackDuration = 10;
     this.cssCommandText = ".heart { transform: scale(2); }";
     this.heartScale = 2;
-    this.knifeFallTimer = 0;
-    this.knifeFallCount = 0;
+    this.tagBarrageTimer = 0;
   }
 
   private updateTagBarrage(dt: number): void {
-    this.knifeFallTimer += dt;
-    if (this.knifeFallTimer >= this.KNIFE_FALL_INTERVAL && this.knifeFallCount < this.KNIFE_FALL_TOTAL) {
-      this.knifeFallTimer = 0;
-      this.knifeFallCount++;
-      const x = this.boxX + (0.15 + Math.random() * 0.7) * this.boxW;
-      const roll = Math.random();
-      if (roll < 0.4) {
-        this.spawnKnife(x, this.boxY - 20, 0, 80);
-      } else {
-        // 60% balises, dont une majorité de "bonnes" pour rester dans l'esprit d'une chute classique
-        const bad = Math.random() < 0.35;
-        this.spawnTag(x, this.boxY - 20, 0, 75, bad);
+    this.tagBarrageTimer += dt;
+    if (this.tagBarrageTimer >= this.TAG_BARRAGE_INTERVAL && this.phaseTimer < this.attackDuration - 0.8) {
+      this.tagBarrageTimer = 0;
+
+      const columns = this.TAG_BARRAGE_COLUMNS;
+      const count = Math.random() < 0.5 ? 2 : 3; // 2 ou 3 projectiles à la fois
+      const chosen: number[] = [];
+      while (chosen.length < count) {
+        const c = Math.floor(Math.random() * columns);
+        if (!chosen.includes(c)) chosen.push(c);
+      }
+
+      for (const i of chosen) {
+        const x = this.boxX + ((i + 0.5) / columns) * this.boxW;
+        this.spawnTag(x, this.boxY - 20, 0, 80, true); // uniquement des mauvaises balises
       }
     }
 
     for (const p of this.projectiles) {
       if (p.done) continue;
       p.y += p.vy * dt * this.speedMultiplier;
-      if (p.isKnife) this.checkKnifeCollision(p); else this.checkTagCollision(p);
+      this.checkTagCollision(p);
       if (p.y > this.boxY + this.boxH + 30) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
 
-    if (this.phaseTimer >= this.attackDuration && this.knifeFallCount >= this.KNIFE_FALL_TOTAL && this.projectiles.length === 0) this.endAttack();
+    if (this.phaseTimer >= this.attackDuration && this.projectiles.length === 0) this.endAttack();
   }
 
 
@@ -889,14 +890,24 @@ export class BossOmori implements Scene {
     this.rotateRainTimer += dt;
     if (this.rotateRainTimer >= 0.5) {
       this.rotateRainTimer = 0;
-      const x = this.boxX + Math.random() * this.boxW;
-      this.spawnKnife(x, this.boxY + this.boxH + 20, 0, -80);
+      const side = Math.floor(Math.random() * 3); // 0 = bas, 1 = gauche, 2 = droite
+      if (side === 0) {
+        const x = this.boxX + Math.random() * this.boxW;
+        this.spawnKnife(x, this.boxY + this.boxH + 20, 0, -80);
+      } else if (side === 1) {
+        const y = this.boxY + Math.random() * this.boxH;
+        this.spawnKnife(this.boxX - 20, y, 80, 0);
+      } else {
+        const y = this.boxY + Math.random() * this.boxH;
+        this.spawnKnife(this.boxX + this.boxW + 20, y, -80, 0);
+      }
     }
     for (const p of this.projectiles) {
       if (p.done) continue;
+      p.x += p.vx * dt * this.speedMultiplier;
       p.y += p.vy * dt * this.speedMultiplier;
       this.checkKnifeCollision(p);
-      if (p.y < this.boxY - 30) p.done = true;
+      if (p.y < this.boxY - 30 || p.x < this.boxX - 30 || p.x > this.boxX + this.boxW + 30) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
     if (this.phaseTimer >= this.attackDuration) this.endAttack();
