@@ -12,7 +12,7 @@ const PLAYER_MAX_HP  = 25;
 const PLAYER_DMG_NORMAL  = 2;
 const PLAYER_DMG_PERFECT = 4;
 
-const OMORI_MAX_HP = 25;
+const OMORI_MAX_HP = 15;
 
 const OMORI_SPRITE_URL = "assets/sprites/Omori.png";
 const OMORI_DISPLAY_W  = 90;
@@ -768,15 +768,9 @@ export class BossOmori implements Scene {
   private attackCssFlexDirection(): void {
     this.attackDuration = 8;
     this.flexRainTimer = 0;
-
-    // Inversion des contrôles tirée au hasard : X seul, Y seul, ou les deux.
-    const mode = Math.floor(Math.random() * 3);
-    this.controlsInvertX = mode === 0 || mode === 2;
-    this.controlsInvertY = mode === 1 || mode === 2;
-    this.cssCommandText =
-      mode === 0 ? ".controls { flex-direction: row-reverse; }" :
-      mode === 1 ? ".controls { flex-direction: column-reverse; }" :
-                   ".controls { flex-direction: row-reverse; flex-wrap: wrap-reverse; }";
+    this.cssCommandText = ".controls { flex-direction: row-reverse; }";
+    this.controlsInvertX = true;
+    this.controlsInvertY = true;
   }
 
   private updateCssFlexDirection(dt: number): void {
