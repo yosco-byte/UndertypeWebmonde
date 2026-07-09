@@ -888,19 +888,17 @@ export class BossOmori implements Scene {
 
   private updateCssRotate(dt: number): void {
     this.rotateRainTimer += dt;
-    if (this.rotateRainTimer >= 0.5) {
+    if (this.rotateRainTimer >= 0.7) {
       this.rotateRainTimer = 0;
-      const side = Math.floor(Math.random() * 3); // 0 = bas, 1 = gauche, 2 = droite
-      if (side === 0) {
-        const x = this.boxX + Math.random() * this.boxW;
-        this.spawnKnife(x, this.boxY + this.boxH + 20, 0, -80);
-      } else if (side === 1) {
-        const y = this.boxY + Math.random() * this.boxH;
-        this.spawnKnife(this.boxX - 20, y, 80, 0);
-      } else {
-        const y = this.boxY + Math.random() * this.boxH;
-        this.spawnKnife(this.boxX + this.boxW + 20, y, -80, 0);
-      }
+      // Un couteau depuis chacun des 3 côtés à chaque vague : 3 couteaux dans les airs à la fois.
+      const xBottom = this.boxX + Math.random() * this.boxW;
+      this.spawnKnife(xBottom, this.boxY + this.boxH + 20, 0, -80);
+
+      const yLeft = this.boxY + Math.random() * this.boxH;
+      this.spawnKnife(this.boxX - 20, yLeft, 80, 0);
+
+      const yRight = this.boxY + Math.random() * this.boxH;
+      this.spawnKnife(this.boxX + this.boxW + 20, yRight, -80, 0);
     }
     for (const p of this.projectiles) {
       if (p.done) continue;
