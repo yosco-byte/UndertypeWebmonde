@@ -12,7 +12,7 @@ const PLAYER_MAX_HP  = 25;
 const PLAYER_DMG_NORMAL  = 2;
 const PLAYER_DMG_PERFECT = 4;
 
-const OMORI_MAX_HP = 25;
+const OMORI_MAX_HP = 15;
 
 const OMORI_SPRITE_URL = "assets/sprites/Omori.png";
 const OMORI_DISPLAY_W  = 90;
@@ -183,15 +183,6 @@ class BattleDialogue {
   }
 }
 
-const SKULL_SHAPE_POINTS: [number, number][] = [
-  [-30, -30], [-15, -40], [0, -42], [15, -40], [30, -30],
-  [-36, -10], [36, -10],
-  [-30, 10], [30, 10],
-  [-20, 26], [-8, 32], [8, 32], [20, 26],
-  [-16, -6], [-8, -6],
-  [8, -6], [16, -6],
-  [-12, 20], [-4, 24], [4, 24], [12, 20],
-];
 
 export class BossOmori implements Scene {
   private hp = PLAYER_MAX_HP;
@@ -772,46 +763,47 @@ export class BossOmori implements Scene {
   }
 
 
-  private formationY = 0;
-  private formationSpawned = false;
+  private flexRainTimer = 0;
 
   private attackCssFlexDirection(): void {
     this.attackDuration = 8;
-    this.cssCommandText = ".controls { flex-direction: column-reverse; }";
-    this.controlsInvertY = true;
-    this.formationY = this.boxY - 60;
-    this.formationSpawned = false;
+    this.flexRainTimer = 0;
+
+    // Inversion des contrôles tirée au hasard : X seul, Y seul, ou les deux.
+    const mode = Math.floor(Math.random() * 3);
+    this.controlsInvertX = mode === 0 || mode === 2;
+    this.controlsInvertY = mode === 1 || mode === 2;
+    this.cssCommandText =
+      mode === 0 ? ".controls { flex-direction: row-reverse; }" :
+      mode === 1 ? ".controls { flex-direction: column-reverse; }" :
+                   ".controls { flex-direction: row-reverse; flex-wrap: wrap-reverse; }";
   }
 
   private updateCssFlexDirection(dt: number): void {
-    if (!this.formationSpawned && this.phaseTimer >= 0.6) {
-      this.formationSpawned = true;
-      const anchorX = this.boxX + this.boxW / 2;
-      for (const [ox, oy] of SKULL_SHAPE_POINTS) {
-        const bad = Math.random() < 0.5;
-        this.spawnTag(anchorX + ox, this.formationY + oy, 0, 0, bad);
-        const p = this.projectiles[this.projectiles.length - 1];
-        p.anchorOffsetX = ox;
-        p.anchorOffsetY = oy;
-      }
+    this.flexRainTimer += dt;
+    if (this.flexRainTimer >= 0.7) {
+      this.flexRainTimer = 0;
+      // Un couteau depuis chacun des 3 côtés à chaque vague : 3 couteaux dans les airs à la fois.
+      const xBottom = this.boxX + Math.random() * this.boxW;
+      this.spawnKnife(xBottom, this.boxY + this.boxH + 20, 0, -80);
+
+      const yLeft = this.boxY + Math.random() * this.boxH;
+      this.spawnKnife(this.boxX - 20, yLeft, 80, 0);
+
+      const yRight = this.boxY + Math.random() * this.boxH;
+      this.spawnKnife(this.boxX + this.boxW + 20, yRight, -80, 0);
     }
 
-    if (this.formationSpawned) {
-      this.formationY += 35 * dt * this.speedMultiplier;
-      const anchorX = this.boxX + this.boxW / 2;
-      for (const p of this.projectiles) {
-        if (p.done) continue;
-        p.x = anchorX + (p.anchorOffsetX ?? 0);
-        p.y = this.formationY + (p.anchorOffsetY ?? 0);
-        this.checkTagCollision(p);
-        if (p.y > this.boxY + this.boxH + 60) p.done = true;
-      }
-      this.projectiles = this.projectiles.filter(p => !p.done);
+    for (const p of this.projectiles) {
+      if (p.done) continue;
+      p.x += p.vx * dt * this.speedMultiplier;
+      p.y += p.vy * dt * this.speedMultiplier;
+      this.checkKnifeCollision(p);
+      if (p.y < this.boxY - 30 || p.x < this.boxX - 30 || p.x > this.boxX + this.boxW + 30) p.done = true;
     }
+    this.projectiles = this.projectiles.filter(p => !p.done);
 
-    if (this.phaseTimer >= this.attackDuration && (this.projectiles.length === 0 || this.formationY > this.boxY + this.boxH + 60)) {
-      this.endAttack();
-    }
+    if (this.phaseTimer >= this.attackDuration) this.endAttack();
   }
 
 
