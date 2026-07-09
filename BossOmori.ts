@@ -725,49 +725,49 @@ export class BossOmori implements Scene {
 
 
   /**
-   * Nouvelle attaque — rafale de balises (cœur doublé)
-   * Le cœur double de taille (hitbox agrandie en conséquence) et Omori
-   * envoie une rafale dense de bonnes et mauvaises balises, en colonnes avec
-   * un "trou" garanti à chaque salve pour que l'esquive reste possible.
+   * Chute classique — un mélange de couteaux et de bonnes/mauvaises balises
+   * tombent un par un depuis le haut de la box, comme au tout début du
+   * combat. Toujours largement esquivable : un seul projectile à la fois,
+   * à intervalle confortable.
    */
-  private tagBarrageTimer = 0;
-  private readonly TAG_BARRAGE_INTERVAL = 0.4;
-  private readonly TAG_BARRAGE_COLUMNS  = 6;
+  private knifeFallTimer = 0;
+  private knifeFallCount = 0;
+  private readonly KNIFE_FALL_INTERVAL = 0.9;
+  private readonly KNIFE_FALL_TOTAL = 6;
 
   private attackTagBarrage(): void {
-    this.attackDuration = 12;
-    this.cssCommandText = ".heart { transform: scale(2); } /* rafale de balises */";
+    this.attackDuration = 8;
+    this.cssCommandText = ".heart { transform: scale(2); }";
     this.heartScale = 2;
-    this.tagBarrageTimer = 0;
+    this.knifeFallTimer = 0;
+    this.knifeFallCount = 0;
   }
 
   private updateTagBarrage(dt: number): void {
-    this.tagBarrageTimer += dt;
-    if (this.tagBarrageTimer >= this.TAG_BARRAGE_INTERVAL && this.phaseTimer < this.attackDuration - 1.2) {
-      this.tagBarrageTimer = 0;
-
-      const columns = this.TAG_BARRAGE_COLUMNS;
-      // Au moins une colonne "sûre" par salve, sans balise, pour garder l'esquive possible.
-      const gapIndex = Math.floor(Math.random() * columns);
-
-      for (let i = 0; i < columns; i++) {
-        if (i === gapIndex) continue;
-        const x   = this.boxX + ((i + 0.5) / columns) * this.boxW;
-        const bad = Math.random() < 0.65; // majorité de mauvaises pour la pression, mais des bonnes aussi
-        this.spawnTag(x, this.boxY - 20, (Math.random() - 0.5) * 10, 85 + Math.random() * 25, bad);
+    this.knifeFallTimer += dt;
+    if (this.knifeFallTimer >= this.KNIFE_FALL_INTERVAL && this.knifeFallCount < this.KNIFE_FALL_TOTAL) {
+      this.knifeFallTimer = 0;
+      this.knifeFallCount++;
+      const x = this.boxX + (0.15 + Math.random() * 0.7) * this.boxW;
+      const roll = Math.random();
+      if (roll < 0.4) {
+        this.spawnKnife(x, this.boxY - 20, 0, 80);
+      } else {
+        // 60% balises, dont une majorité de "bonnes" pour rester dans l'esprit d'une chute classique
+        const bad = Math.random() < 0.35;
+        this.spawnTag(x, this.boxY - 20, 0, 75, bad);
       }
     }
 
     for (const p of this.projectiles) {
       if (p.done) continue;
-      p.x += p.vx * dt * this.speedMultiplier;
       p.y += p.vy * dt * this.speedMultiplier;
-      this.checkTagCollision(p);
+      if (p.isKnife) this.checkKnifeCollision(p); else this.checkTagCollision(p);
       if (p.y > this.boxY + this.boxH + 30) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
 
-    if (this.phaseTimer >= this.attackDuration && this.projectiles.length === 0) this.endAttack();
+    if (this.phaseTimer >= this.attackDuration && this.knifeFallCount >= this.KNIFE_FALL_TOTAL && this.projectiles.length === 0) this.endAttack();
   }
 
 
