@@ -12,7 +12,7 @@ const PLAYER_MAX_HP  = 25;
 const PLAYER_DMG_NORMAL  = 2;
 const PLAYER_DMG_PERFECT = 4;
 
-const OMORI_MAX_HP = 15;
+const OMORI_MAX_HP = 30;
 
 const OMORI_SPRITE_URL = "assets/sprites/Omori.png";
 const OMORI_DISPLAY_W  = 90;
@@ -489,7 +489,6 @@ export class BossOmori implements Scene {
       () => this.attackCssFlexDirection(),
       () => this.attackKnifeCross(),
       () => this.attackCssOpacity(),
-      () => this.attackCssRotate(),
       () => this.attackTagsSpiral(),
       () => this.attackFinalCombo(),
       () => this.attackCssScale(),
@@ -835,11 +834,15 @@ export class BossOmori implements Scene {
 
 
   private opacityRainTimer = 0;
+  private opacityStateTimer = 0;
+  private opacityInvisible = false;
 
   private attackCssOpacity(): void {
     this.attackDuration = 8;
     this.cssCommandText = ".danger { opacity: 0.1; }";
     this.opacityRainTimer = 0;
+    this.opacityStateTimer = 0;
+    this.opacityInvisible = false;
     this.flickerActive = true;
   }
 
@@ -851,47 +854,21 @@ export class BossOmori implements Scene {
       if (Math.random() < 0.5) this.spawnKnife(x, this.boxY - 20, 0, 75);
       else this.spawnTag(x, this.boxY - 20, 0, 60, Math.random() < 0.4);
     }
+
+    this.opacityStateTimer += dt;
+    if (!this.opacityInvisible && this.opacityStateTimer >= 2) {
+      this.opacityInvisible = true;
+      this.opacityStateTimer = 0;
+    } else if (this.opacityInvisible && this.opacityStateTimer >= 3) {
+      this.opacityInvisible = false;
+      this.opacityStateTimer = 0;
+    }
+
     for (const p of this.projectiles) {
       if (p.done) continue;
       p.y += p.vy * dt * this.speedMultiplier;
       if (p.isKnife) this.checkKnifeCollision(p); else this.checkTagCollision(p);
       if (p.y > this.boxY + this.boxH + 30) p.done = true;
-    }
-    this.projectiles = this.projectiles.filter(p => !p.done);
-    if (this.phaseTimer >= this.attackDuration) this.endAttack();
-  }
-
-
-  private rotateRainTimer = 0;
-
-  private attackCssRotate(): void {
-    this.attackDuration = 8;
-    this.cssCommandText = ".player { transform: rotate(180deg); }";
-    this.controlsInvertX = true;
-    this.controlsInvertY = true;
-    this.rotateRainTimer = 0;
-  }
-
-  private updateCssRotate(dt: number): void {
-    this.rotateRainTimer += dt;
-    if (this.rotateRainTimer >= 0.7) {
-      this.rotateRainTimer = 0;
-      // Un couteau depuis chacun des 3 côtés à chaque vague : 3 couteaux dans les airs à la fois.
-      const xBottom = this.boxX + Math.random() * this.boxW;
-      this.spawnKnife(xBottom, this.boxY + this.boxH + 20, 0, -80);
-
-      const yLeft = this.boxY + Math.random() * this.boxH;
-      this.spawnKnife(this.boxX - 20, yLeft, 80, 0);
-
-      const yRight = this.boxY + Math.random() * this.boxH;
-      this.spawnKnife(this.boxX + this.boxW + 20, yRight, -80, 0);
-    }
-    for (const p of this.projectiles) {
-      if (p.done) continue;
-      p.x += p.vx * dt * this.speedMultiplier;
-      p.y += p.vy * dt * this.speedMultiplier;
-      this.checkKnifeCollision(p);
-      if (p.y < this.boxY - 30 || p.x < this.boxX - 30 || p.x > this.boxX + this.boxW + 30) p.done = true;
     }
     this.projectiles = this.projectiles.filter(p => !p.done);
     if (this.phaseTimer >= this.attackDuration) this.endAttack();
@@ -1223,7 +1200,7 @@ export class BossOmori implements Scene {
 
   private updateCurrentAttack(dt: number): void {
     const index = this.attacksUsed - 1;
-    switch (index % 16) {
+    switch (index % 15) {
       case 0: this.updateKnifeWave(dt); break;
       case 1: this.updateTagsRain(dt); break;
       case 2: this.updateCssColor(dt); break;
@@ -1232,14 +1209,13 @@ export class BossOmori implements Scene {
       case 5: this.updateCssFlexDirection(dt); break;
       case 6: this.updateKnifeCross(dt); break;
       case 7: this.updateCssOpacity(dt); break;
-      case 8: this.updateCssRotate(dt); break;
-      case 9: this.updateTagsSpiral(dt); break;
-      case 10: this.updateFinalCombo(dt); break;
-      case 11: this.updateCssScale(dt); break;
-      case 12: this.updateCssGrid(dt); break;
-      case 13: this.updateCssTransition(dt); break;
-      case 14: this.updateKnifeRing(dt); break;
-      case 15: this.updateCssAnimationDelay(dt); break;
+      case 8: this.updateTagsSpiral(dt); break;
+      case 9: this.updateFinalCombo(dt); break;
+      case 10: this.updateCssScale(dt); break;
+      case 11: this.updateCssGrid(dt); break;
+      case 12: this.updateCssTransition(dt); break;
+      case 13: this.updateKnifeRing(dt); break;
+      case 14: this.updateCssAnimationDelay(dt); break;
     }
   }
 
@@ -1343,7 +1319,7 @@ export class BossOmori implements Scene {
 
   private renderProjectiles(ctx: CanvasRenderingContext2D): void {
     for (const p of this.projectiles) {
-      if (this.flickerActive && Math.sin(Date.now() / 60 + p.x) > 0.6) continue;
+      if (this.flickerActive && this.opacityInvisible) continue;
 
       if (p.isKnife) {
         ctx.save();
