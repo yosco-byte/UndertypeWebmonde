@@ -457,13 +457,17 @@ export class BossOmori implements Scene {
     this.dialogue.start(DIALOGUE_GAMEOVER, () => this.endBattle(false));
   }
 
-  private endBattle(victory: boolean): void {
-    this.stopMusic();
-    this.startFade(victory ? "white" : "black", 0, 1, () => {
-      sceneManager.goto("overworld");
-    });
-  }
 
+private endBattle(victory: boolean): void {
+  this.stopMusic();
+  this.startFade(victory ? "white" : "black", 0, 1, () => {
+    if (victory) {
+      sceneManager.goto("bossVirus");
+    } else {
+      sceneManager.goto("overworld");
+    }
+  });
+}
 
   private startNextAttack(): void {
     if (this.attacksUsed >= MAX_ATTACKS) {
