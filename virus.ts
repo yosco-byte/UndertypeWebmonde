@@ -431,7 +431,6 @@ export class BossVirus implements Scene {
     this.startFade("black", 1, 0, () => {
       this.dialogue.start(DIALOGUE_INTRO, () => this.startPlayerTurn());
       this.phase = "dialogueIntro";
-      this.playCri();
     });
   }
 
@@ -622,7 +621,6 @@ export class BossVirus implements Scene {
       const text = BETWEEN_PHASE_LINES[Math.floor(Math.random() * BETWEEN_PHASE_LINES.length)];
       this.phase = "betweenPhrase";
       this.dialogue.start([{ speaker: "Virus", text }], onDone);
-      this.playCri();
     } else {
       onDone();
     }
@@ -707,7 +705,6 @@ export class BossVirus implements Scene {
         this.score += SCORE_BAD;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
-        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       } else {
         this.score += SCORE_GOOD;
@@ -753,7 +750,7 @@ export class BossVirus implements Scene {
       const x = this.boxX + Math.random() * this.boxW;
       const bad = Math.random() < 0.45;
       const isBig = !bad && Math.random() < 0.25;
-      this.spawnTag(x, this.boxY - 20, 0, 45 + Math.random() * 25, bad, false, isBig);
+      this.spawnTag(x, this.boxY - 20, 0, 45 + Math.random() * 25, bad, true, isBig);
     }
     for (const p of this.projectiles) {
       if (p.done) continue;
@@ -814,7 +811,6 @@ export class BossVirus implements Scene {
         h.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.35, 7);
-        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
       if (h.x < this.boxX - 60 || h.x > this.boxX + this.boxW + 60) h.done = true;
@@ -915,7 +911,6 @@ export class BossVirus implements Scene {
         a.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
-        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
       if (a.life <= 0 || a.x < this.boxX - 60 || a.x > this.boxX + this.boxW + 60 || a.y < this.boxY - 60 || a.y > this.boxY + this.boxH + 60) {
@@ -990,7 +985,6 @@ export class BossVirus implements Scene {
         w.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
-        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
         continue;
       }
@@ -1115,7 +1109,6 @@ export class BossVirus implements Scene {
         s.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
-        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
     }
@@ -1189,7 +1182,6 @@ export class BossVirus implements Scene {
         if (hit) {
           this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
           this.triggerShake(0.3, 6);
-          this.playCri();
           s.firing = 0; // un seul dégât par tir
           if (this.hp <= 0) this.triggerGameOver();
         }
@@ -1315,7 +1307,6 @@ export class BossVirus implements Scene {
           if (!inGap) {
             this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
             this.triggerShake(0.3, 6);
-            this.playCri();
             b.done = true;
             if (this.hp <= 0) this.triggerGameOver();
           }
@@ -1326,7 +1317,6 @@ export class BossVirus implements Scene {
           if (!isAbove) {
             this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
             this.triggerShake(0.3, 6);
-            this.playCri();
             b.done = true;
             if (this.hp <= 0) this.triggerGameOver();
           }
@@ -1432,7 +1422,6 @@ export class BossVirus implements Scene {
         s.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
-        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
     }
@@ -1494,7 +1483,6 @@ export class BossVirus implements Scene {
           if (dot > 0) {
             this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
             this.triggerShake(0.3, 7);
-            this.playCri();
             if (this.hp <= 0) this.triggerGameOver();
           }
         }
@@ -1761,10 +1749,14 @@ export class BossVirus implements Scene {
   }
 
   private renderProjectiles(ctx: CanvasRenderingContext2D): void {
+    // Première attaque (index 0, trojan tags) : pas de code couleur, tout en blanc
+    const isFirstAttackPattern = this.phase === "attack" && (this.attacksUsed - 1) % 10 === 0;
     for (const p of this.projectiles) {
       ctx.save();
       ctx.font = `bold ${Math.round(13 * p.scale)}px 'Courier New', monospace`;
-      ctx.fillStyle = p.isTrojan ? "#ff8c00" : (p.bad ? "#ff5555" : "#e0e0e0");
+      ctx.fillStyle = isFirstAttackPattern
+        ? "#e0e0e0"
+        : (p.isTrojan ? "#ff8c00" : (p.bad ? "#ff5555" : "#e0e0e0"));
       ctx.fillText(p.text, p.x - ctx.measureText(p.text).width / 2, p.y);
       ctx.restore();
     }
