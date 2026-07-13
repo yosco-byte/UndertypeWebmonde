@@ -1,4 +1,3 @@
-
 import { Input } from "./Input";
 import { sceneManager } from "./SceneManager";
 import { OverworldScene } from "./OverworldScene";
@@ -107,13 +106,14 @@ export class Game {
       }
     }
     if (
-        this.input.isDown("KeyY") && 
-        this.input.isDown("KeyU") && 
-        this.input.isDown("KeyI") 
-    
-) {
-  sceneManager.goto("bossVirus");
-}
+        this.input.isDown("KeyY") &&
+        this.input.isDown("KeyU") &&
+        this.input.isDown("KeyI") &&
+        sceneManager.getCurrentId() !== "bossVirus"
+    ) {
+      sceneManager.goto("bossVirus");
+    }
+
     sceneManager.update(dt);
     sceneManager.render(this.ctx);
 
