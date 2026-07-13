@@ -1126,6 +1126,20 @@ private endBattle(victory: boolean): void {
 
 
   update(dt: number): void {
+    // Raccourci debug : C + V déclenche la victoire instantanée contre Omori
+    if (
+      this.input.isDown("KeyC") &&
+      this.input.isDown("KeyV") &&
+      this.phase !== "victory" &&
+      this.phase !== "gameOver" &&
+      this.phase !== "fadeOutWhite" &&
+      this.phase !== "fadeOutBlack"
+    ) {
+      this.omoriHp = 0;
+      this.startVictory();
+      return;
+    }
+
     this.updateFade(dt);
     if (this.shakeTime > 0) this.shakeTime -= dt;
 
