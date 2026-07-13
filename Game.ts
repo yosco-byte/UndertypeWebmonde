@@ -6,6 +6,8 @@ import { BossGrinch } from "./BossGrinch";
 import { BossMonika } from "./BossMonika";
 import { BossOmori } from "./BossOmori";
 import { gameState } from "./GameState";
+import { BossVirus } from "./virus";
+
 
 const TARGET_FPS = 60;
 const MAX_DT = 1 / 15; 
@@ -60,6 +62,10 @@ export class Game {
       "bossOmori",
       () => new BossOmori(input, W, H)
     );
+    
+    sceneManager.register(
+      "bossVirus", 
+      () => new BossVirus(input, W, H));
 
     sceneManager.goto("overworld");
   }
