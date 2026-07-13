@@ -14,16 +14,16 @@ const PLAYER_DMG_PERFECT = 6; // critique en zone rouge
 
 const VIRUS_MAX_HP = 45;
 
-const VIRUS_SPRITE_URL = "assets/sprites/virus.jpg";
+const VIRUS_SPRITE_URL = "/assets/sprites/virus.jpg";
 const VIRUS_DISPLAY_W  = 100;
 const VIRUS_DISPLAY_H  = 130;
 
-const HEART_SPRITE_URL = "assets/sprites/heart.png";
+const HEART_SPRITE_URL = "/assets/sprites/heart.png";
 
-const BOSS_MUSIC_URL    = "assets/music/BossVirus.mp3";
+const BOSS_MUSIC_URL    = "/assets/music/BossVirus.mp3";
 const BOSS_MUSIC_VOLUME = 0.6;
 
-const CRI_SOUND_URL = "assets/music/cri.mp3";
+const CRI_SOUND_URL = "/assets/music/cri.mp3";
 
 const TAG_DMG_BAD  = 3;
 const SCORE_GOOD   = 500;
@@ -753,7 +753,7 @@ export class BossVirus implements Scene {
       const x = this.boxX + Math.random() * this.boxW;
       const bad = Math.random() < 0.45;
       const isBig = !bad && Math.random() < 0.25;
-      this.spawnTag(x, this.boxY - 20, 0, 45 + Math.random() * 25, bad, true, isBig);
+      this.spawnTag(x, this.boxY - 20, 0, 45 + Math.random() * 25, bad, false, isBig);
     }
     for (const p of this.projectiles) {
       if (p.done) continue;
