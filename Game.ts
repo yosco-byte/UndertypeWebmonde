@@ -105,15 +105,15 @@ export class Game {
         sceneManager.goto("bossOmori");
       }
     }
+    
     if (
-        this.input.isDown("KeyY") &&
-        this.input.isDown("KeyU") &&
-        this.input.isDown("KeyI") &&
-        sceneManager.getCurrentId() !== "bossVirus"
-    ) {
-      sceneManager.goto("bossVirus");
+      this.inputisDown("KeyY") &&
+      this.input.isDown("KeyU") &&
+      this.input.isDown("KeyI")
+      ) {
+      sceneManager.goto("BossVirus");
     }
-
+      
     sceneManager.update(dt);
     sceneManager.render(this.ctx);
 
