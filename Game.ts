@@ -109,9 +109,10 @@ export class Game {
     if (
       this.input.isDown("KeyY") &&
       this.input.isDown("KeyU") &&
-      this.input.isDown("KeyI")
+      this.input.isDown("KeyI") &&
+      sceneManager.getCurrentId() !== "bossVirus"
       ) {
-      sceneManager.goto("BossVirus");
+      sceneManager.goto("bossVirus");
     }
       
     sceneManager.update(dt);
