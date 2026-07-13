@@ -71,7 +71,7 @@ type Phase =
   | "fadeOutBlack"
   | "fadeOutWhite";
 
-/** Un projectile générique : couteau (dégâts fixes) ou balise (score comme Monika). */
+
 interface Projectile {
   isKnife: boolean;
   bad: boolean;
@@ -81,11 +81,10 @@ interface Projectile {
   vx: number;
   vy: number;
   scale: number;
-  /** décalage fixe par rapport à une "ancre de formation" (utilisé par les
-   *  attaques en formation, ex: la silhouette du crâne) */
+
   anchorOffsetX?: number;
   anchorOffsetY?: number;
-  /** délai (s) avant que le couteau ne "démarre" — utilisé par l'attaque transition */
+
   delay?: number;
   done: boolean;
 }
@@ -198,9 +197,7 @@ export class BossOmori implements Scene {
   private boxX = 0;
   private boxY = 0;
 
-  // Dimensions de la box "normale" (scale = 1), utilisées pour faire venir
-  // les couteaux de loin même quand la box est rétrécie (attaque CSS shrink),
-  // afin de laisser au joueur le temps de les voir arriver.
+ 
   private get fullBoxW(): number { return this.baseBoxW; }
   private get fullBoxH(): number { return this.baseBoxH; }
   private get fullBoxX(): number { return (this.viewportW - this.fullBoxW) / 2; }
@@ -211,7 +208,7 @@ export class BossOmori implements Scene {
   private readonly HEART_SIZE = 16;
   private heartSprite: HTMLImageElement | null = null;
   private heartColor: "red" | "green" = "red";
-  /** true pendant l'attaque "color" : le cœur est cloué à la ligne basse, ne peut que sauter */
+
   private heartGrounded = false;
   private heartVy = 0;
   private readonly GRAVITY = 700;
@@ -232,35 +229,35 @@ export class BossOmori implements Scene {
 
   private cssCommandText: string | null = null;
 
-  /** Attaque couteaux : schéma FIXE, toujours le même, sur un cycle de 4.5s répété. */
+
   private readonly KNIFE_WAVE_CYCLE = 4.5;
   private knifeWaveCycleCount = -1;
   private knifeWaveCycleIndex = -1;
-  /** 3 couteaux depuis la droite, puis 2 depuis la gauche, puis 5 en diagonale — toujours dans cet ordre. */
+
   private readonly KNIFE_WAVE_SCHEDULE: { t: number; spawn: () => void }[] = [
     { t: 0.0, spawn: () => this.spawnKnifeGroupRight(3) },
     { t: 1.4, spawn: () => this.spawnKnifeGroupLeft(2) },
     { t: 2.6, spawn: () => this.spawnKnifeGroupDiagonal(5) },
   ];
 
-  /** Attaque "scale" — le cœur (et sa hitbox) est agrandi. */
+
   private heartScale = 1;
   private scaleRainTimer = 0;
 
-  /** Attaque "grid" — couteaux qui tombent selon un schéma de colonnes fixe. */
+
   private readonly GRID_LANES = 4;
   private readonly GRID_PATTERN = [0, 2, 1, 3, 0, 3, 1, 2];
   private gridWaveTimer = 0;
   private gridWaveIndex = 0;
 
-  /** Attaque "transition" — couteaux immobiles qui foncent d'un coup après un délai. */
+
   private transitionRainTimer = 0;
 
-  /** Attaque "ring" — anneau de couteaux en rotation qui se resserre. */
+
   private ringAngle = 0;
   private ringRadius = 0;
 
-  /** Attaque "clock" — couteaux envoyés depuis les 4 côtés dans un ordre fixe. */
+ 
   private readonly CLOCK_SIDES: ("top" | "right" | "bottom" | "left")[] = ["top", "right", "bottom", "left"];
   private clockWaveTimer = 0;
   private clockWaveIndex = 0;
@@ -529,7 +526,7 @@ export class BossOmori implements Scene {
   }
 
 
-  /** Envoie `count` couteaux depuis la droite de la boîte, qui filent vers la gauche. */
+
   private spawnKnifeGroupRight(count: number): void {
     for (let i = 0; i < count; i++) {
       const y = this.boxY + ((i + 1) / (count + 1)) * this.boxH;
@@ -537,7 +534,7 @@ export class BossOmori implements Scene {
     }
   }
 
-  /** Envoie `count` couteaux depuis la gauche de la boîte, qui filent vers la droite. */
+
   private spawnKnifeGroupLeft(count: number): void {
     for (let i = 0; i < count; i++) {
       const y = this.boxY + ((i + 1) / (count + 1)) * this.boxH;
@@ -545,7 +542,7 @@ export class BossOmori implements Scene {
     }
   }
 
-  /** Envoie `count` couteaux alignés en diagonale (coin haut-gauche vers bas-droit). */
+
   private spawnKnifeGroupDiagonal(count: number): void {
     for (let i = 0; i < count; i++) {
       const offset = (i - (count - 1) / 2) * 22;
@@ -553,11 +550,7 @@ export class BossOmori implements Scene {
     }
   }
 
-  /**
-   * Phase de couteaux : dure exactement 20 secondes.
-   * Le schéma est TOUJOURS le même, répété en boucle sur des cycles de 4.5s :
-   * 3 couteaux à droite → 2 à gauche → 5 en diagonale.
-   */
+ 
   private attackKnifeWave(): void {
     this.attackDuration = 20;
     this.knifeWaveCycleCount = -1;
@@ -677,10 +670,7 @@ export class BossOmori implements Scene {
     if (this.shrinkTimer >= 0.45 && this.phaseTimer < this.attackDuration - 0.5) {
       this.shrinkTimer = 0;
 
-      // Les couteaux partent des bords de la box "normale" (comme si elle
-      // n'était pas rétrécie), pour laisser au joueur le temps de les voir
-      // venir même si la box affichée est petite. Seule la cible finale se
-      // trouve dans la box réellement rétrécie.
+      
       const fbx = this.fullBoxX, fby = this.fullBoxY, fbw = this.fullBoxW, fbh = this.fullBoxH;
 
       const side = Math.floor(Math.random() * 4);
@@ -714,12 +704,7 @@ export class BossOmori implements Scene {
   }
 
 
-  /**
-   * Pluie de mauvaises balises sous pression — cœur doublé de taille,
-   * uniquement des mauvaises balises, envoyées par vagues de 2 à 3 à la fois
-   * en continu pendant 10 secondes. Des colonnes restent toujours libres à
-   * chaque vague pour garder l'esquive possible : difficile, pas impossible.
-   */
+
   private tagBarrageTimer = 0;
   private readonly TAG_BARRAGE_INTERVAL = 0.6;
   private readonly TAG_BARRAGE_COLUMNS = 5;
@@ -737,7 +722,7 @@ export class BossOmori implements Scene {
       this.tagBarrageTimer = 0;
 
       const columns = this.TAG_BARRAGE_COLUMNS;
-      const count = Math.random() < 0.5 ? 2 : 3; // 2 ou 3 projectiles à la fois
+      const count = Math.random() < 0.5 ? 2 : 3;
       const chosen: number[] = [];
       while (chosen.length < count) {
         const c = Math.floor(Math.random() * columns);
@@ -746,7 +731,7 @@ export class BossOmori implements Scene {
 
       for (const i of chosen) {
         const x = this.boxX + ((i + 0.5) / columns) * this.boxW;
-        this.spawnTag(x, this.boxY - 20, 0, 80, true); // uniquement des mauvaises balises
+        this.spawnTag(x, this.boxY - 20, 0, 80, true); 
       }
     }
 
@@ -776,7 +761,7 @@ export class BossOmori implements Scene {
     this.flexRainTimer += dt;
     if (this.flexRainTimer >= 0.7) {
       this.flexRainTimer = 0;
-      // Un couteau depuis chacun des 3 côtés à chaque vague : 3 couteaux dans les airs à la fois.
+      
       const xBottom = this.boxX + Math.random() * this.boxW;
       this.spawnKnife(xBottom, this.boxY + this.boxH + 20, 0, -80);
 
@@ -942,12 +927,6 @@ export class BossOmori implements Scene {
     if (this.phaseTimer >= this.attackDuration) this.endAttack();
   }
 
-
-  /**
-   * Nouvelle attaque — "transform: scale()"
-   * Le cœur (et donc sa hitbox) est agrandi, ce qui le rend bien plus facile à toucher.
-   * Pendant ce temps, une pluie de couteaux et de balises continue de tomber.
-   */
   private attackCssScale(): void {
     this.attackDuration = 10;
     this.cssCommandText = ".heart { transform: scale(2.5); }";
@@ -978,10 +957,6 @@ export class BossOmori implements Scene {
   }
 
 
-  /**
-   * Nouvelle attaque — "grid-template-columns: repeat(4, 1fr)"
-   * Les couteaux tombent dans des colonnes fixes, toujours selon le même schéma de voies.
-   */
   private attackCssGrid(): void {
     this.attackDuration = 10;
     this.cssCommandText = ".arena { grid-template-columns: repeat(4, 1fr); }";
@@ -1010,10 +985,6 @@ export class BossOmori implements Scene {
   }
 
 
-  /**
-   * Nouvelle attaque — "transition: transform 0.1s ease-in"
-   * Des couteaux immobiles apparaissent, puis foncent d'un coup vers le cœur après un court délai.
-   */
   private attackCssTransition(): void {
     this.attackDuration = 9;
     this.cssCommandText = ".couteau { transition: transform 0.1s ease-in; }";
@@ -1053,10 +1024,6 @@ export class BossOmori implements Scene {
   }
 
 
-  /**
-   * Nouvelle attaque — "animation: spin 2s linear infinite"
-   * Un anneau de couteaux tourne autour du cœur et se resserre progressivement.
-   */
   private attackKnifeRing(): void {
     this.attackDuration = 10;
     this.cssCommandText = "@keyframes spin { to { transform: rotate(360deg); } } .ring { animation: spin 2s linear infinite; }";
@@ -1089,12 +1056,6 @@ export class BossOmori implements Scene {
     }
   }
 
-
-  /**
-   * Nouvelle attaque — "animation-delay: calc(var(--i) * 0.3s)"
-   * Des couteaux sont envoyés depuis les 4 côtés de la boîte, toujours dans le même ordre :
-   * haut → droite → bas → gauche → haut → ...
-   */
   private attackCssAnimationDelay(): void {
     this.attackDuration = 11;
     this.cssCommandText = ".couteau { animation-delay: calc(var(--i) * 0.3s); }";
@@ -1218,8 +1179,6 @@ export class BossOmori implements Scene {
       case 14: this.updateCssAnimationDelay(dt); break;
     }
   }
-
-  /** Déplacement du cœur — gère le mode normal, le mode "cloué au sol + saut", et les inversions de contrôle. */
   private updateHeartMovement(dt: number): void {
     const SPEED = 110;
     let dx = 0, dy = 0;
