@@ -44,13 +44,13 @@ const MONIKA_MAX_HITS = 10;
 // --- Attaque 3 : FLEUR ---
 const FLEUR_WORD               = "FLEUR";
 const FLEUR_HASH                = "#";
-const FLEUR_CONVERGE_DURATION   = 0.9;  // temps pour que "FLEUR" et "#" se rejoignent
-const FLEUR_DISPLAY_DURATION    = 0.5;  // temps d'affichage du gros mot (36px) avant qu'il descende
-const FLEUR_DESCEND_DURATION    = 1.1;  // temps de descente vers le centre de la box
-const FLEUR_STAR_COUNT          = 14;   // nombre d'étoiles libérées à l'explosion
+const FLEUR_CONVERGE_DURATION   = 0.9;  
+const FLEUR_DISPLAY_DURATION    = 0.5;  
+const FLEUR_DESCEND_DURATION    = 1.1; 
+const FLEUR_STAR_COUNT          = 14;   
 const FLEUR_STAR_SPEED          = 150;
 const FLEUR_STAR_LIFETIME       = 2.2;
-const FLEUR_END_DELAY           = 0.4;  // petit délai après la disparition des étoiles
+const FLEUR_END_DELAY           = 0.4;  
 
 
 const DIALOGUE_INTRO: DialogueLine[] = [
@@ -70,7 +70,7 @@ const DIALOGUE_INSPECT: DialogueLine[] = [
   { speaker: "Système", text: '  System.out.println; }' },
 ];
 
-// --- Attaque 4 : balises mal orthographiées (dégâts) + bonnes balises (score) ---
+
 const MISSPELLED_TAGS_BAD: string[] = [
   "<dvi>",
   "<spn>",
@@ -94,11 +94,11 @@ const MISSPELLED_TAGS_GOOD: string[] = [
 
 const ATK4_DURATION            = 15;
 const ATK4_SPAWN_INTERVAL      = 0.55;
-const ATK4_GOOD_CHANCE         = 0.3;   // proba qu'une balise apparue soit une bonne balise (score)
-const ATK4_SURPRISE_CHANCE     = 0.35;  // proba qu'une balise mauvaise grossisse d'un coup (les bonnes ne grossissent jamais)
-const ATK4_SURPRISE_SCALE      = 2;     // facteur de grossissement (x2)
-const ATK4_SURPRISE_MIN_DELAY  = 0.4;   // délai min avant la surprise (secondes après l'apparition)
-const ATK4_SURPRISE_MAX_DELAY  = 1.4;   // délai max avant la surprise
+const ATK4_GOOD_CHANCE         = 0.3;   
+const ATK4_SURPRISE_CHANCE     = 0.35;  
+const ATK4_SURPRISE_SCALE      = 2;    
+const ATK4_SURPRISE_MIN_DELAY  = 0.4;   
+const ATK4_SURPRISE_MAX_DELAY  = 1.4;  
 
 
 const DIALOGUE_AFTER_ATK4: DialogueLine[] = [];
@@ -156,9 +156,9 @@ interface MisspelledTag {
   zigzagAmp: number;
   zigzagFreq: number;
   time: number;
-  scale: number;        // 1 = taille normale, monte à ATK4_SURPRISE_SCALE
-  surpriseAt: number;   // instant (en secondes depuis l'apparition) où elle grossit d'un coup
-  surprised: boolean;   // a-t-elle déjà grossi ?
+  scale: number;        
+  surpriseAt: number;   
+  surprised: boolean;   
   done: boolean;
 }
 
@@ -323,42 +323,42 @@ export class BossMonika implements Scene {
   private atk1SpawnTimer = 0;
   private readonly ATK1_DURATION = 15;  
   private readonly SPAWN_INTERVAL = 0.6; 
-  // Attaque 2 — balises rebondissantes
+  
   private bouncingTags: BouncingTag[] = [];
   private atk2Timer = 0;
   private readonly ATK2_DURATION  = 10;
   private readonly BOUNCE_SPAWN_INTERVAL = 0.5;
   private atk2SpawnTimer = 0;
 
-  // Attaque 3 — FLEUR
+  
   private fleurSubPhase: "converge" | "display" | "descend" | "explode" | "done" = "converge";
   private fleurTimer = 0;
   private fleurTargetX = 0;
-  private fleurTargetY = 0;      // point de convergence, juste sous Monika
-  private fleurWordX = 0;        // position courante du morceau "FLEUR" (vient de la droite)
-  private fleurHashX = 0;        // position courante du morceau "#" (vient de la gauche)
-  private fleurCurrentY = 0;     // position Y du gros mot pendant la descente
+  private fleurTargetY = 0;     
+  private fleurWordX = 0;        
+  private fleurHashX = 0;        
+  private fleurCurrentY = 0;     
   private fleurStars: FleurStar[] = [];
 
-  // Attaque 4 — balises mal orthographiées avec effet de surprise (x4)
+  
   private misspelledTags: MisspelledTag[] = [];
   private atk4Timer = 0;
   private atk4SpawnTimer = 0;
 
-  // Rotation des attaques après la première (attack1 = intro) : alterne attack2 / attack3 / attack4
+  
   private attackIndex = -1;
 
   
-  private rhythmBarPos   = 0;       // 0..1 = position de la barre
-  private rhythmBarDir   = 1;       // sens de déplacement
-  private readonly RHYTHM_SPEED = 0.8;  // vitesse de la barre (unités/s)
-  private rhythmHit      = false;   // a-t-on appuyé sur Z?
-  private rhythmPerfect  = false;   // était-ce dans la zone rouge?
-  private rhythmResultTimer = 0;    // durée d'affichage du résultat
+  private rhythmBarPos   = 0;       
+  private rhythmBarDir   = 1;      
+  private readonly RHYTHM_SPEED = 0.8;  
+  private rhythmHit      = false;   
+  private rhythmPerfect  = false;  
+  private rhythmResultTimer = 0;   
 
  
-  private actSelected = 0;          // 0 = Parler, 1 = Inspecter l'élément
-  private menuSelected = 0;          // 0=FIGHT 1=ACT 2=ITEM 3=MERCY
+  private actSelected = 0;        
+  private menuSelected = 0;          
   private readonly ACT_OPTIONS = ["Parler", "Inspecter l'élément"];
 
 
@@ -623,10 +623,6 @@ export class BossMonika implements Scene {
   }
 
 
-
-  // Alterne entre l'attaque 2 (balises rebondissantes), l'attaque 3 (FLEUR)
-  // et l'attaque 4 (balises mal orthographiées surprises) pour que Monika
-  // ne répète plus indéfiniment la même attaque.
   private startNextAttack(): void {
     this.attackIndex = (this.attackIndex + 1) % 3;
     if (this.attackIndex === 0) {
@@ -742,18 +738,14 @@ export class BossMonika implements Scene {
   }
 
 
-  // --- Attaque 3 : FLEUR ---
-  // "FLEUR" arrive depuis la droite, "#" depuis la gauche, ils se rejoignent
-  // sous Monika pour former le gros mot "FLEUR" (36px). Le mot descend ensuite
-  // jusqu'au centre de la box, puis explose en libérant des étoiles qui
-  // traversent toute la zone de combat.
+  
   private startAttack3(): void {
     this.phase = "attack3";
     this.fleurSubPhase = "converge";
     this.fleurTimer = 0;
     this.fleurStars = [];
     this.fleurTargetX = this.monikaX;
-    this.fleurTargetY = this.monikaY + 16; // juste sous Monika
+    this.fleurTargetY = this.monikaY + 16;
     this.fleurCurrentY = this.fleurTargetY;
     this.fleurWordX = this.viewportW + 60;
     this.fleurHashX = -60;
@@ -854,12 +846,6 @@ export class BossMonika implements Scene {
     }
   }
 
-
-  // --- Attaque 4 : balises mal orthographiées ---
-  // Des balises invalides tombent vers le joueur (dégâts), mélangées à de
-  // bonnes balises (bonus de score). Certaines mauvaises balises, tirées au
-  // sort, doublent de taille brusquement après un court délai pour
-  // surprendre le joueur en plein esquive.
   private startAttack4(): void {
     this.phase = "attack4";
     this.atk4Timer = 0;
@@ -888,7 +874,7 @@ export class BossMonika implements Scene {
       scale: 1,
       surpriseAt: willSurprise
         ? ATK4_SURPRISE_MIN_DELAY + Math.random() * (ATK4_SURPRISE_MAX_DELAY - ATK4_SURPRISE_MIN_DELAY)
-        : -1, // -1 = ne grossira jamais
+        : -1, 
       surprised: false,
       done: false,
     });
@@ -909,7 +895,7 @@ export class BossMonika implements Scene {
       tag.y    += tag.speedY * dt;
       tag.x     = tag.startX + Math.sin(tag.time * tag.zigzagFreq) * tag.zigzagAmp;
 
-      // Effet de surprise : grossissement brutal et soudain (x2), mauvaises balises seulement
+      
       if (!tag.surprised && tag.surpriseAt >= 0 && tag.time >= tag.surpriseAt) {
         tag.surprised = true;
         tag.scale = ATK4_SURPRISE_SCALE;
@@ -923,7 +909,7 @@ export class BossMonika implements Scene {
 
       tag.x = Math.max(this.boxX + 5, Math.min(this.boxX + this.boxW - 5, tag.x));
 
-      // Le rayon de collision grandit avec la taille de la balise
+    
       const dist = Math.hypot(tag.x - this.heartX, tag.y - this.heartY);
       if (dist < this.HEART_SIZE * ((tag.scale - 1) * 0.5 + 1)) {
         tag.done = true;
