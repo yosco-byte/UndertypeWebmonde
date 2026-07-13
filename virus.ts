@@ -23,8 +23,6 @@ const HEART_SPRITE_URL = "assets/sprites/heart.png";
 const BOSS_MUSIC_URL    = "assets/music/BossVirus.mp3";
 const BOSS_MUSIC_VOLUME = 0.6;
 
-const CRI_SOUND_URL = "assets/music/cri.mp3";
-
 const TAG_DMG_BAD  = 3;
 const SCORE_GOOD   = 500;
 const SCORE_BAD    = -1000;
@@ -56,6 +54,16 @@ const DIALOGUE_DISMISS_ACT: DialogueLine[] = [
 const DIALOGUE_DISMISS_ITEM: DialogueLine[] = [
   { speaker: "Système", text: "* Aucun objet ne peut stopper une infection." },
 ];
+
+const POTION_NAME = "Potion de faible";
+const POTION_HEAL = 30;
+
+const DIALOGUE_ITEM_USED: DialogueLine[] = [
+  { speaker: "Système", text: `* Vous buvez la Potion de faible. PV +${POTION_HEAL}.` },
+];
+const DIALOGUE_ITEM_EMPTY: DialogueLine[] = [
+  { speaker: "Système", text: "* Vous n'avez plus d'objet dans votre inventaire." },
+];
 const DIALOGUE_DISMISS_MERCY: DialogueLine[] = [
   { speaker: "Virus", text: ". . ." },
 ];
@@ -80,6 +88,7 @@ type Phase =
   | "fadeIn"
   | "dialogueIntro"
   | "playerTurn"
+  | "itemMenu"
   | "fightRhythm"
   | "dismiss"
   | "betweenPhrase"
@@ -330,6 +339,8 @@ export class BossVirus implements Scene {
   private attackDuration = 0;
 
   private menuSelected = 0;
+  private hasPotion = true;
+  private itemMenuSelected = 0;
 
   private rhythmBarPos = 0;
   private rhythmBarDir = 1;
@@ -431,6 +442,7 @@ export class BossVirus implements Scene {
     this.startFade("black", 1, 0, () => {
       this.dialogue.start(DIALOGUE_INTRO, () => this.startPlayerTurn());
       this.phase = "dialogueIntro";
+      this.playCri();
     });
   }
 
@@ -541,8 +553,8 @@ export class BossVirus implements Scene {
       this.dialogue.start(DIALOGUE_DISMISS_ACT, () => this.startPlayerTurn());
       this.phase = "dismiss";
     } else if (this.menuSelected === 2) {
-      this.dialogue.start(DIALOGUE_DISMISS_ITEM, () => this.startPlayerTurn());
-      this.phase = "dismiss";
+      this.itemMenuSelected = 0;
+      this.phase = "itemMenu";
     } else {
       this.dialogue.start(DIALOGUE_DISMISS_MERCY, () => this.startPlayerTurn());
       this.phase = "dismiss";
@@ -621,6 +633,7 @@ export class BossVirus implements Scene {
       const text = BETWEEN_PHASE_LINES[Math.floor(Math.random() * BETWEEN_PHASE_LINES.length)];
       this.phase = "betweenPhrase";
       this.dialogue.start([{ speaker: "Virus", text }], onDone);
+      this.playCri();
     } else {
       onDone();
     }
@@ -705,6 +718,7 @@ export class BossVirus implements Scene {
         this.score += SCORE_BAD;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
+        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       } else {
         this.score += SCORE_GOOD;
@@ -750,7 +764,7 @@ export class BossVirus implements Scene {
       const x = this.boxX + Math.random() * this.boxW;
       const bad = Math.random() < 0.45;
       const isBig = !bad && Math.random() < 0.25;
-      this.spawnTag(x, this.boxY - 20, 0, 45 + Math.random() * 25, bad, true, isBig);
+      this.spawnTag(x, this.boxY - 20, 0, 45 + Math.random() * 25, bad, false, isBig);
     }
     for (const p of this.projectiles) {
       if (p.done) continue;
@@ -811,6 +825,7 @@ export class BossVirus implements Scene {
         h.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.35, 7);
+        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
       if (h.x < this.boxX - 60 || h.x > this.boxX + this.boxW + 60) h.done = true;
@@ -911,6 +926,7 @@ export class BossVirus implements Scene {
         a.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
+        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
       if (a.life <= 0 || a.x < this.boxX - 60 || a.x > this.boxX + this.boxW + 60 || a.y < this.boxY - 60 || a.y > this.boxY + this.boxH + 60) {
@@ -985,6 +1001,7 @@ export class BossVirus implements Scene {
         w.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
+        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
         continue;
       }
@@ -1109,6 +1126,7 @@ export class BossVirus implements Scene {
         s.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
+        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
     }
@@ -1182,6 +1200,7 @@ export class BossVirus implements Scene {
         if (hit) {
           this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
           this.triggerShake(0.3, 6);
+          this.playCri();
           s.firing = 0; // un seul dégât par tir
           if (this.hp <= 0) this.triggerGameOver();
         }
@@ -1307,6 +1326,7 @@ export class BossVirus implements Scene {
           if (!inGap) {
             this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
             this.triggerShake(0.3, 6);
+            this.playCri();
             b.done = true;
             if (this.hp <= 0) this.triggerGameOver();
           }
@@ -1317,6 +1337,7 @@ export class BossVirus implements Scene {
           if (!isAbove) {
             this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
             this.triggerShake(0.3, 6);
+            this.playCri();
             b.done = true;
             if (this.hp <= 0) this.triggerGameOver();
           }
@@ -1422,6 +1443,7 @@ export class BossVirus implements Scene {
         s.done = true;
         this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
         this.triggerShake(0.3, 6);
+        this.playCri();
         if (this.hp <= 0) this.triggerGameOver();
       }
     }
@@ -1431,13 +1453,6 @@ export class BossVirus implements Scene {
       this.endAttack();
     }
   }
-
-  // ============================================================
-  // ATTAQUE 10 : CRÂNES TOURNANTS
-  // Des crânes volent en orbite autour de la box. Quand un crâne
-  // devient rouge, il tire un laser à haute vitesse vers le joueur.
-  // Tirs en alternance, haute tension, pendant 20 secondes.
-  // ============================================================
 
   private attackRotatingSkulls(): void {
     this.attackDuration = 20;
@@ -1467,7 +1482,7 @@ export class BossVirus implements Scene {
 
       if (s.redTimer <= 0 && !s.isRed) {
         s.isRed = true;
-        s.laserTimer = 0.5; // temps de "charge" visible avant le tir
+        s.laserTimer = 0.5; 
       } else if (s.isRed && !s.laserFired) {
         s.laserTimer -= dt;
         if (s.laserTimer <= 0) {
@@ -1478,16 +1493,17 @@ export class BossVirus implements Scene {
           const sy = cy + Math.sin(s.angle) * s.radius;
           const dx = this.heartX - sx, dy = this.heartY - sy;
           const len = Math.hypot(dx, dy) || 1;
-          // laser instantané haute vitesse : collision immédiate si aligné
+
           const dot = (dx / len) * (this.heartX - sx) + (dy / len) * (this.heartY - sy);
           if (dot > 0) {
             this.hp = Math.max(0, this.hp - TAG_DMG_BAD);
             this.triggerShake(0.3, 7);
+            this.playCri();
             if (this.hp <= 0) this.triggerGameOver();
           }
         }
       } else if (s.isRed && s.laserFired) {
-        // cooldown avant de redevenir blanc et reprendre le cycle
+       
         s.laserTimer -= dt;
         if (s.laserTimer <= -1.0) {
           s.isRed = false;
@@ -1557,9 +1573,6 @@ export class BossVirus implements Scene {
     }
   }
 
-  // ============================================================
-  // MOUVEMENT DU JOUEUR
-  // ============================================================
 
   private updateHeartMovement(dt: number): void {
     const SPEED = 110;
@@ -1569,7 +1582,7 @@ export class BossVirus implements Scene {
     if (this.input.isDown("ArrowUp") || this.input.isDown("KeyW")) dy = -1;
     else if (this.input.isDown("ArrowDown") || this.input.isDown("KeyS")) dy = 1;
 
-    // Attaque ransomware : axe unique
+
     if (this.axisLock === "horizontal") dy = 0;
     if (this.axisLock === "vertical") dx = 0;
 
@@ -1582,7 +1595,7 @@ export class BossVirus implements Scene {
     const half = (this.HEART_SIZE * 1) / 2;
 
     if (this.heartGrounded) {
-      // Attaque dino/flappy : le cœur reste au sol, ne peut que sauter
+   
       this.heartX = Math.max(this.boxX + half, Math.min(this.boxX + this.boxW - half, this.heartX + dx * SPEED * dt));
 
       const wantsJump = this.input.isDown("Space") || this.input.isDown("ArrowUp") || this.input.isDown("KeyW");
@@ -1604,10 +1617,6 @@ export class BossVirus implements Scene {
     }
   }
 
-  // ============================================================
-  // BOUCLE PRINCIPALE
-  // ============================================================
-
   update(dt: number): void {
     this.updateFade(dt);
     if (this.shakeTime > 0) this.shakeTime -= dt;
@@ -1624,6 +1633,9 @@ export class BossVirus implements Scene {
     switch (this.phase) {
       case "playerTurn":
         this.updatePlayerMenu();
+        break;
+      case "itemMenu":
+        this.updateItemMenu();
         break;
       case "fightRhythm":
         this.updateFightRhythm(dt);
@@ -1648,6 +1660,35 @@ export class BossVirus implements Scene {
     }
   }
 
+  private updateItemMenu(): void {
+
+    const itemCount = 1;
+    if (this.input.wasPressed("ArrowLeft") || this.input.wasPressed("KeyQ") || this.input.wasPressed("KeyA")) {
+      this.itemMenuSelected = (this.itemMenuSelected + itemCount - 1) % itemCount;
+    } else if (this.input.wasPressed("ArrowRight") || this.input.wasPressed("KeyD")) {
+      this.itemMenuSelected = (this.itemMenuSelected + 1) % itemCount;
+    } else if (this.input.wasPressed("KeyZ") || this.input.wasPressed("Enter")) {
+      this.confirmItemSelection();
+    } else if (this.input.wasPressed("KeyX") || this.input.wasPressed("Escape")) {
+      this.phase = "playerTurn";
+    }
+  }
+
+  private confirmItemSelection(): void {
+    
+    if (this.itemMenuSelected === 0) {
+      if (this.hasPotion) {
+        this.hasPotion = false;
+        this.hp = Math.min(PLAYER_MAX_HP, this.hp + POTION_HEAL);
+        this.dialogue.start(DIALOGUE_ITEM_USED, () => this.maybeStartBetweenPhrase(() => this.startNextAttack()));
+        this.phase = "dismiss";
+      } else {
+        this.dialogue.start(DIALOGUE_ITEM_EMPTY, () => { this.phase = "itemMenu"; });
+        this.phase = "dismiss";
+      }
+    }
+  }
+
   private updateCurrentAttack(dt: number): void {
     const index = this.attacksUsed - 1;
     switch (index % 10) {
@@ -1664,9 +1705,6 @@ export class BossVirus implements Scene {
     }
   }
 
-  // ============================================================
-  // RENDU
-  // ============================================================
 
   render(ctx: CanvasRenderingContext2D): void {
     let shakeX = 0, shakeY = 0;
@@ -1687,7 +1725,7 @@ export class BossVirus implements Scene {
     const index = this.attacksUsed - 1;
     if (this.phase === "attack") {
       switch (index % 10) {
-        case 4: this.renderDdosSafeLane(ctx); break; // sous les projectiles
+        case 4: this.renderDdosSafeLane(ctx); break; 
       }
     }
 
@@ -1709,7 +1747,8 @@ export class BossVirus implements Scene {
     this.renderCssCommand(ctx);
     this.renderHUD(ctx);
 
-    if (this.phase === "playerTurn") this.renderActionButtons(ctx);
+    if (this.phase === "playerTurn" || this.phase === "itemMenu") this.renderActionButtons(ctx);
+    if (this.phase === "itemMenu") this.renderItemMenu(ctx);
     if (this.phase === "fightRhythm") this.renderRhythmBar(ctx);
 
     ctx.restore();
@@ -1749,14 +1788,10 @@ export class BossVirus implements Scene {
   }
 
   private renderProjectiles(ctx: CanvasRenderingContext2D): void {
-    // Première attaque (index 0, trojan tags) : pas de code couleur, tout en blanc
-    const isFirstAttackPattern = this.phase === "attack" && (this.attacksUsed - 1) % 10 === 0;
     for (const p of this.projectiles) {
       ctx.save();
       ctx.font = `bold ${Math.round(13 * p.scale)}px 'Courier New', monospace`;
-      ctx.fillStyle = isFirstAttackPattern
-        ? "#e0e0e0"
-        : (p.isTrojan ? "#ff8c00" : (p.bad ? "#ff5555" : "#e0e0e0"));
+      ctx.fillStyle = p.isTrojan ? "#ff8c00" : (p.bad ? "#ff5555" : "#e0e0e0");
       ctx.fillText(p.text, p.x - ctx.measureText(p.text).width / 2, p.y);
       ctx.restore();
     }
@@ -1881,6 +1916,33 @@ export class BossVirus implements Scene {
       ctx.textAlign = "center";
       ctx.fillText((selected ? "❤ " : "  ") + label, x + w / 2, y + h / 2 + 5);
     });
+    ctx.textAlign = "left";
+  }
+
+  private renderItemMenu(ctx: CanvasRenderingContext2D): void {
+    const x = 16, y = this.viewportH - 150, w = this.viewportW - 32, h = 66;
+
+    ctx.fillStyle = "#000";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "#ff8c00";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w, h);
+
+    const selected = this.itemMenuSelected === 0;
+    ctx.font = "bold 15px 'Courier New', monospace";
+    ctx.fillStyle = selected ? "#fff" : "#aaa";
+    ctx.textAlign = "left";
+    const label = this.hasPotion ? POTION_NAME : `${POTION_NAME} (épuisé)`;
+    ctx.fillText((selected ? "❤ " : "  ") + label, x + 16, y + 26);
+
+    ctx.font = "13px 'Courier New', monospace";
+    ctx.fillStyle = "#7ee787";
+    ctx.fillText(this.hasPotion ? `Soigne ${POTION_HEAL} PV.` : "Vous n'en avez plus.", x + 16, y + 48);
+
+    ctx.font = "12px 'Courier New', monospace";
+    ctx.fillStyle = "#888";
+    ctx.textAlign = "right";
+    ctx.fillText("Z: utiliser   X: retour", x + w - 16, y + h - 10);
     ctx.textAlign = "left";
   }
 
