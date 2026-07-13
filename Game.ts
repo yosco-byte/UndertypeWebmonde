@@ -107,7 +107,7 @@ export class Game {
     }
     
     if (
-      this.inputisDown("KeyY") &&
+      this.input.isDown("KeyY") &&
       this.input.isDown("KeyU") &&
       this.input.isDown("KeyI")
       ) {
